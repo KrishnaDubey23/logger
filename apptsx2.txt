@@ -1,0 +1,2481 @@
+with diff ui 
+/**
+ * Workout Logger App
+ * Minimal MVP: Add exercises and sets (reps, weight). In-memory only.
+ * @format
+ */
+
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  StatusBar,
+  StyleSheet,
+  useColorScheme,
+  View,
+  Text,
+  TextInput,
+  Pressable,
+  FlatList,
+  ScrollView,
+  Modal,
+  Platform,
+  useWindowDimensions,
+  Animated,
+  PanResponder,
+  Easing,
+} from 'react-native';
+import Svg, { G, Polygon, Line, Circle, Text as SvgText, Path } from 'react-native-svg';
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
+
+// RoundedView: currently behaves like a normal View (continuous corners disabled)
+const USE_CONTINUOUS_CURVE = false;
+const RoundedView = React.forwardRef<View, React.ComponentProps<typeof View>>(({ style, ...rest }, forwardedRef) => {
+  const localRef = useRef<View>(null);
+  useEffect(() => {
+    const node = localRef.current as any;
+    if (USE_CONTINUOUS_CURVE && Platform.OS === 'ios' && node) {
+      try {
+        node.setNativeProps({ cornerCurve: 'continuous' });
+      } catch { }
+    }
+  }, [style]);
+
+  return (
+    <View
+      ref={(node) => {
+        // @ts-ignore assign to local and forwarded refs
+        localRef.current = node;
+        if (typeof forwardedRef === 'function') forwardedRef(node as any);
+        else if (forwardedRef && 'current' in (forwardedRef as any)) (forwardedRef as any).current = node as any;
+      }}
+      style={style}
+      {...rest}
+    />
+  );
+});
+RoundedView.displayName = 'RoundedView';
+
+type BodyPart =
+  | 'Chest'
+  | 'Back'
+  | 'Legs'
+  | 'Shoulders'
+  | 'Arms'
+  | 'Core'
+  | 'Glutes'
+  | 'Full Body';
+
+type SetItem = { id: string; reps: number; weight: number };
+type Exercise = { id: string; name: string; bodyPart: BodyPart; sets: SetItem[]; timestamp: number };
+
+const BODY_PARTS: BodyPart[] = [
+  'Chest',
+  'Back',
+  'Legs',
+  'Shoulders',
+  'Arms',
+  'Core',
+  'Glutes',
+  'Full Body',
+];
+
+const EXERCISE_LIBRARY: Array<{ name: string; bodyPart: BodyPart }> = [
+  { name: 'Bench Press', bodyPart: 'Chest' },
+  { name: 'Incline DB Press', bodyPart: 'Chest' },
+  { name: 'Push-Up', bodyPart: 'Chest' },
+  { name: 'Pull-Up', bodyPart: 'Back' },
+  { name: 'Deadlift', bodyPart: 'Back' },
+  { name: 'Bent-Over Row', bodyPart: 'Back' },
+  { name: 'Back Squat', bodyPart: 'Legs' },
+  { name: 'Leg Press', bodyPart: 'Legs' },
+  { name: 'Lunge', bodyPart: 'Legs' },
+  { name: 'Overhead Press', bodyPart: 'Shoulders' },
+  { name: 'Lateral Raise', bodyPart: 'Shoulders' },
+  { name: 'Bicep Curl', bodyPart: 'Arms' },
+  { name: 'Tricep Pushdown', bodyPart: 'Arms' },
+  { name: 'Plank', bodyPart: 'Core' },
+  { name: 'Hanging Leg Raise', bodyPart: 'Core' },
+  { name: 'Hip Thrust', bodyPart: 'Glutes' },
+  { name: 'Kettlebell Swing', bodyPart: 'Full Body' },
+];
+
+function App() {
+  const isDarkMode = useColorScheme() === 'dark';
+
+  return (
+    <SafeAreaProvider>
+      <SafeAreaView edges={['top']} style={{ flex: 1 }}>
+        <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
+        <AppContent />
+      </SafeAreaView>
+    </SafeAreaProvider>
+  );
+}
+
+function RadarChart({
+  theme,
+  size = 220,
+  levels = 4,
+  labels,
+  values,
+}: {
+  theme: typeof lightTheme;
+  size?: number;
+  levels?: number;
+  labels: string[];
+  values: number[];
+}) {
+  const count = labels.length;
+  const cx = size / 2;
+  const cy = size / 2;
+  const r = (size * 0.38);
+  const isDark = theme.bg === '#000000';
+  const strokeColor = isDark ? '#64D2FF' : '#0A84FF';
+  const fillOpacity = isDark ? 0.22 : 0.18;
+
+  const colorForLabel = (label: string) => {
+    const key = label.toLowerCase();
+    const light: Record<string, string> = {
+      chest: '#FF3B30',
+      back: '#0A84FF',
+      legs: '#34C759',
+      shoulders: '#FF9F0A',
+      arms: '#BF5AF2',
+      abs: '#30B0C7',
+    };
+    const dark: Record<string, string> = {
+      chest: '#FF453A',
+      back: '#64D2FF',
+      legs: '#30D158',
+      shoulders: '#FFD60A',
+      arms: '#BF5AF2',
+      abs: '#64D2FF',
+    };
+    return (isDark ? dark : light)[key] || theme.textSecondary;
+  };
+  const angleFor = (i: number) => (Math.PI * 2 * i) / count - Math.PI / 2;
+  const toPoint = (radius: number, i: number) => {
+    const a = angleFor(i);
+    return [cx + radius * Math.cos(a), cy + radius * Math.sin(a)];
+  };
+  const gridPolys: string[] = [];
+  for (let l = 1; l <= levels; l++) {
+    const radius = (r * l) / levels;
+    const pts = Array.from({ length: count }, (_, i) => toPoint(radius, i).join(',')).join(' ');
+    gridPolys.push(pts);
+  }
+  const dataPts = Array.from({ length: count }, (_, i) => toPoint(r * Math.max(0, Math.min(1, values[i] || 0)), i).join(',')).join(' ');
+
+  const labelRadius = r + 18;
+  const labelPositions = labels.map((_, i) => toPoint(labelRadius, i));
+
+  return (
+    <View style={{ alignItems: 'center', justifyContent: 'center' }}>
+      <Svg width={size} height={size}>
+        <G>
+          {gridPolys.map((pts, idx) => (
+            <Polygon key={`g${idx}`} points={pts} fill="none" stroke={theme.border} strokeWidth={1} />
+          ))}
+          {Array.from({ length: count }, (_, i) => (
+            <Line key={`axis${i}`} x1={cx} y1={cy} x2={toPoint(r, i)[0]} y2={toPoint(r, i)[1]} stroke={theme.border} strokeWidth={1} />
+          ))}
+          <Polygon points={dataPts} fill={strokeColor} opacity={fillOpacity} stroke={strokeColor} strokeWidth={2} />
+          <Circle cx={cx} cy={cy} r={2} fill={theme.textSecondary} />
+          {labelPositions.map(([x, y], i) => (
+            <SvgText key={`lbl${i}`} x={x} y={y} fill={colorForLabel(labels[i])} fontSize={11} fontWeight="700" textAnchor="middle" alignmentBaseline="middle">
+              {labels[i]}
+            </SvgText>
+          ))}
+        </G>
+      </Svg>
+    </View>
+  );
+}
+
+function BodyPartPickerModal({
+  visible,
+  onClose,
+  theme,
+  selected,
+  onSelect,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  theme: typeof lightTheme;
+  selected: BodyPart;
+  onSelect: (bp: BodyPart) => void;
+}) {
+  return (
+    <Modal animationType="slide" visible={visible} onRequestClose={onClose} transparent>
+      <View style={styles.modalBackdrop}>
+        <RoundedView style={[styles.modalCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
+          <View style={[styles.cardHeader, { marginBottom: 12 }]}>
+            <Text style={[styles.cardTitle, { color: theme.text }]}>Select Body Part</Text>
+            <Pressable onPress={onClose} style={({ pressed }) => [styles.iconBtn, { backgroundColor: pressed ? theme.dangerPressed : theme.danger }]}>
+              <Text style={styles.iconText}>Close</Text>
+            </Pressable>
+          </View>
+
+          <FlatList
+            data={BODY_PARTS}
+            keyExtractor={(bp) => bp}
+            renderItem={({ item }) => (
+              <Pressable onPress={() => onSelect(item)} style={({ pressed }) => [styles.libraryItem, { borderColor: theme.border, backgroundColor: pressed || selected === item ? theme.input : theme.card }]}>
+                <Text style={{ color: theme.text, fontWeight: '600' }}>{item}</Text>
+                {selected === item && (
+                  <View style={[styles.badge, { backgroundColor: theme.input, borderColor: theme.border }]}>
+                    <Text style={[styles.badgeText, { color: theme.textSecondary }]}>Selected</Text>
+                  </View>
+                )}
+              </Pressable>
+            )}
+            ItemSeparatorComponent={() => <View style={{ height: 8 }} />}
+            contentContainerStyle={{ paddingBottom: 8 }}
+          />
+        </RoundedView>
+      </View>
+    </Modal>
+  );
+}
+
+function ExerciseLibraryModal({
+  visible,
+  onClose,
+  theme,
+  filter,
+  setFilter,
+  onSelect,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  theme: typeof lightTheme;
+  filter: BodyPart | 'All';
+  setFilter: (bp: BodyPart | 'All') => void;
+  onSelect: (item: { name: string; bodyPart: BodyPart }) => void;
+}) {
+  const list = useMemo(
+    () => EXERCISE_LIBRARY.filter(e => (filter === 'All' ? true : e.bodyPart === filter)),
+    [filter],
+  );
+
+
+  return (
+    <Modal animationType="slide" visible={visible} onRequestClose={onClose} transparent>
+      <View style={styles.modalBackdrop}>
+        <RoundedView style={[styles.modalCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
+          <View style={[styles.cardHeader, { marginBottom: 12 }]}>
+            <Text style={[styles.cardTitle, { color: theme.text }]}>Exercise Library</Text>
+            <Pressable onPress={onClose} style={({ pressed }) => [styles.iconBtn, { backgroundColor: pressed ? theme.dangerPressed : theme.danger }]}>
+              <Text style={styles.iconText}>Close</Text>
+            </Pressable>
+          </View>
+
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsRow}>
+            <Pressable onPress={() => setFilter('All')} style={[styles.chip, { borderColor: theme.border, backgroundColor: filter === 'All' ? theme.accent : theme.card }]}>
+              <Text style={{ color: filter === 'All' ? '#fff' : theme.textSecondary, fontWeight: '600' }}>All</Text>
+            </Pressable>
+            {BODY_PARTS.map(bp => (
+              <Pressable key={bp} onPress={() => setFilter(bp)} style={[styles.chip, { borderColor: theme.border, backgroundColor: filter === bp ? theme.accent : theme.card }]}>
+                <Text style={{ color: filter === bp ? '#fff' : theme.textSecondary, fontWeight: '600' }}>{bp}</Text>
+              </Pressable>
+            ))}
+          </ScrollView>
+
+          <FlatList
+            data={list}
+            keyExtractor={(item, idx) => `${item.name}-${idx}`}
+            renderItem={({ item }) => (
+              <Pressable onPress={() => onSelect(item)} style={({ pressed }) => [styles.libraryItem, { borderColor: theme.border, backgroundColor: pressed ? theme.input : theme.card }]}>
+                <Text style={{ color: theme.text, fontWeight: '600' }}>{item.name}</Text>
+                <View style={[styles.badge, { backgroundColor: theme.input, borderColor: theme.border }]}>
+                  <Text style={[styles.badgeText, { color: theme.textSecondary }]}>{item.bodyPart}</Text>
+                </View>
+              </Pressable>
+            )}
+            ItemSeparatorComponent={() => <View style={{ height: 8 }} />}
+            contentContainerStyle={{ paddingBottom: 8 }}
+          />
+        </RoundedView>
+      </View>
+    </Modal>
+  );
+}
+
+function SwipeButton({ onSwipeSuccess, theme }: { onSwipeSuccess: () => void; theme: typeof lightTheme }) {
+  const [swiped, setSwiped] = useState(false);
+  const [containerWidth, setContainerWidth] = useState(0);
+  const containerWidthRef = useRef(0);
+  const pan = useRef(new Animated.ValueXY()).current;
+  const KNOB_SIZE = 48;
+  const PADDING = 4;
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onPanResponderMove: (_, gestureState) => {
+        const width = containerWidthRef.current;
+        if (width === 0) return;
+        const maxDrag = width - KNOB_SIZE - PADDING * 2;
+        if (gestureState.dx > 0 && gestureState.dx <= maxDrag) {
+          pan.setValue({ x: gestureState.dx, y: 0 });
+        }
+      },
+      onPanResponderRelease: (_, gestureState) => {
+        const width = containerWidthRef.current;
+        if (width === 0) return;
+        const maxDrag = width - KNOB_SIZE - PADDING * 2;
+        const SWIPE_THRESHOLD = maxDrag * 0.7;
+
+        if (gestureState.dx > SWIPE_THRESHOLD) {
+          setSwiped(true);
+          Animated.timing(pan, {
+            toValue: { x: maxDrag, y: 0 },
+            duration: 200,
+            useNativeDriver: false,
+          }).start(() => {
+            onSwipeSuccess();
+            // Reset after success
+            setTimeout(() => {
+              setSwiped(false);
+              pan.setValue({ x: 0, y: 0 });
+            }, 500);
+          });
+        } else {
+          Animated.spring(pan, {
+            toValue: { x: 0, y: 0 },
+            useNativeDriver: false,
+          }).start();
+        }
+      },
+    })
+  ).current;
+
+  return (
+    <View
+      style={[styles.swipeButtonContainer, { backgroundColor: theme.input, borderColor: theme.border }]}
+      onLayout={(e) => {
+        const w = e.nativeEvent.layout.width;
+        setContainerWidth(w);
+        containerWidthRef.current = w;
+      }}
+    >
+      {/* Background Text (Gray) */}
+      <View style={{ position: 'absolute', width: '100%', height: '100%', justifyContent: 'center', alignItems: 'center' }}>
+        <Text style={[styles.swipeText, { color: theme.textSecondary }]}>
+          {swiped ? 'Confirmed!' : 'Swipe to Add'}
+        </Text>
+      </View>
+
+      {/* Foreground Fill (Black with White Text) */}
+      <Animated.View
+        style={{
+          position: 'absolute',
+          left: 0,
+          top: 0,
+          bottom: 0,
+          width: Animated.add(pan.x, KNOB_SIZE + PADDING),
+          backgroundColor: theme.accent,
+          borderRadius: 28,
+          overflow: 'hidden',
+        }}
+      >
+        <View style={{ width: containerWidth, height: '100%', justifyContent: 'center', alignItems: 'center' }}>
+          <Text style={[styles.swipeText, { color: theme.onAccent }]}>
+            {swiped ? 'Confirmed!' : 'Swipe to Add'}
+          </Text>
+        </View>
+      </Animated.View>
+
+      {/* Knob */}
+      <Animated.View
+        style={[
+          styles.swipeKnob,
+          {
+            backgroundColor: theme.accent,
+            transform: [{ translateX: pan.x }],
+            zIndex: 10,
+          },
+        ]}
+        {...panResponder.panHandlers}
+      >
+        <Svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke={theme.onAccent} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+          <Line x1="5" y1="12" x2="19" y2="12" />
+          <Line x1="12" y1="5" x2="19" y2="12" />
+          <Line x1="12" y1="19" x2="19" y2="12" />
+        </Svg>
+      </Animated.View>
+    </View>
+  );
+}
+
+function AddExerciseSheet({
+  visible,
+  onClose,
+  theme,
+  onAdd,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  theme: typeof lightTheme;
+  onAdd: (exercise: { name: string; bodyPart: BodyPart; sets: number; reps: number; weight: number; timestamp: number }) => void;
+}) {
+  const [selectedBodyPart, setSelectedBodyPart] = useState<BodyPart>('Chest');
+  const [selectedExercise, setSelectedExercise] = useState('');
+  const [sets, setSets] = useState('3');
+  const [reps, setReps] = useState('10');
+  const [weight, setWeight] = useState('0');
+  const [bodyPartPickerOpen, setBodyPartPickerOpen] = useState(false);
+  const [exercisePickerOpen, setExercisePickerOpen] = useState(false);
+  const [currentTime, setCurrentTime] = useState(new Date());
+
+  // Update time every second
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const formatDateTime = (date: Date) => {
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = date.getFullYear();
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    return `${day}/${month}/${year} ${hours}:${minutes}`;
+  };
+
+  // Filter exercises based on selected body part
+  const availableExercises = useMemo(() =>
+    EXERCISE_LIBRARY.filter(e => e.bodyPart === selectedBodyPart),
+    [selectedBodyPart]);
+
+  // Reset exercise when body part changes
+  useEffect(() => {
+    if (availableExercises.length > 0) {
+      setSelectedExercise(availableExercises[0].name);
+    } else {
+      setSelectedExercise('');
+    }
+  }, [selectedBodyPart, availableExercises]);
+
+  const handleAdd = () => {
+    if (!selectedExercise) return;
+    const s = parseInt(sets, 10);
+    const r = parseInt(reps, 10);
+    const w = parseFloat(weight);
+    if (isNaN(s) || isNaN(r) || isNaN(w)) return;
+
+    onAdd({
+      name: selectedExercise,
+      bodyPart: selectedBodyPart,
+      sets: s,
+      reps: r,
+      weight: w,
+      timestamp: Date.now(),
+    });
+    onClose();
+  };
+
+  const handleNumericInput = (text: string, setter: (val: string) => void) => {
+    const filtered = text.replace(/[^0-9.]/g, '');
+    setter(filtered);
+  };
+
+  return (
+    <Modal animationType="slide" visible={visible} onRequestClose={onClose} transparent>
+      <View style={styles.modalBackdrop}>
+        <View style={[styles.bottomSheet, { backgroundColor: theme.card, borderColor: theme.border }]}>
+          <View style={styles.sheetHeader}>
+            <View>
+              <Text style={[styles.sheetTitle, { color: theme.text }]}>Add Exercise</Text>
+              <Text style={[styles.dateTimeText, { color: theme.muted }]}>{formatDateTime(currentTime)}</Text>
+            </View>
+            <Pressable onPress={onClose} style={styles.closeButton}>
+              <Svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke={theme.textSecondary} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                <Line x1="18" y1="6" x2="6" y2="18" />
+                <Line x1="6" y1="6" x2="18" y2="18" />
+              </Svg>
+            </Pressable>
+          </View>
+
+          <View style={styles.sheetContent}>
+            {/* Body Part Dropdown */}
+            <Text style={[styles.label, { color: theme.textSecondary }]}>Body Part</Text>
+            <Pressable onPress={() => setBodyPartPickerOpen(true)} style={[styles.dropdown, { backgroundColor: theme.input, borderColor: theme.border }]}>
+              <Text style={{ color: theme.text }}>{selectedBodyPart}</Text>
+              <Svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke={theme.textSecondary} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                <Line x1="6" y1="9" x2="12" y2="15" />
+                <Line x1="18" y1="9" x2="12" y2="15" />
+              </Svg>
+            </Pressable>
+
+            {/* Exercise Dropdown */}
+            <Text style={[styles.label, { color: theme.textSecondary, marginTop: 16 }]}>Exercise</Text>
+            <Pressable onPress={() => setExercisePickerOpen(true)} style={[styles.dropdown, { backgroundColor: theme.input, borderColor: theme.border }]}>
+              <Text style={{ color: theme.text }}>{selectedExercise || 'Select Exercise'}</Text>
+              <Svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke={theme.textSecondary} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                <Line x1="6" y1="9" x2="12" y2="15" />
+                <Line x1="18" y1="9" x2="12" y2="15" />
+              </Svg>
+            </Pressable>
+
+            {/* Sets & Reps */}
+            <View style={styles.rowInputs}>
+              <View style={{ flex: 1, marginRight: 8 }}>
+                <Text style={[styles.label, { color: theme.textSecondary, marginTop: 16 }]}>Sets</Text>
+                <TextInput
+                  style={[{ backgroundColor: '#F2F2F7', borderColor: '#E5E5EA', color: '#000000' }, styles.inputBig]}
+                  placeholderTextColor="#999999"
+                  value={sets}
+                  onChangeText={(t) => handleNumericInput(t, setSets)}
+                  keyboardType="numeric"
+                />
+              </View>
+              <View style={{ flex: 1, marginLeft: 8 }}>
+                <Text style={[styles.label, { color: theme.textSecondary, marginTop: 16 }]}>Reps</Text>
+                <TextInput
+                  style={[{ backgroundColor: '#F2F2F7', borderColor: '#E5E5EA', color: '#000000' }, styles.inputBig]}
+                  placeholderTextColor="#999999"
+                  value={reps}
+                  onChangeText={(t) => handleNumericInput(t, setReps)}
+                  keyboardType="numeric"
+                />
+              </View>
+            </View>
+
+            {/* Weight */}
+            <View>
+              <Text style={[styles.label, { color: theme.textSecondary, marginTop: 16 }]}>Weight (kg)</Text>
+              <TextInput
+                style={[{ backgroundColor: '#F2F2F7', borderColor: '#E5E5EA', color: '#000000', width: '100%' }, styles.inputBig]}
+                placeholderTextColor="#999999"
+                value={weight}
+                onChangeText={(t) => handleNumericInput(t, setWeight)}
+                keyboardType="numeric"
+              />
+            </View>
+
+            {/* Swipe Button */}
+            <View style={{ marginTop: 32, marginBottom: 16 }}>
+              <SwipeButton onSwipeSuccess={handleAdd} theme={theme} />
+            </View>
+          </View>
+        </View>
+      </View>
+
+
+      {/* Reusing existing BodyPartPickerModal */}
+      <BodyPartPickerModal
+        visible={bodyPartPickerOpen}
+        onClose={() => setBodyPartPickerOpen(false)}
+        theme={theme}
+        selected={selectedBodyPart}
+        onSelect={(bp) => {
+          setSelectedBodyPart(bp);
+          setBodyPartPickerOpen(false);
+        }}
+      />
+
+      {/* Simple Exercise Picker Modal (Internal) */}
+      <Modal animationType="fade" visible={exercisePickerOpen} onRequestClose={() => setExercisePickerOpen(false)} transparent>
+        <View style={styles.modalBackdrop}>
+          <RoundedView style={[styles.modalCard, { backgroundColor: theme.card, borderColor: theme.border, maxHeight: '60%' }]}>
+            <View style={styles.cardHeader}>
+              <Text style={[styles.cardTitle, { color: theme.text }]}>Select Exercise</Text>
+              <Pressable onPress={() => setExercisePickerOpen(false)} style={styles.iconBtn}>
+                <Text style={styles.iconText}>Close</Text>
+              </Pressable>
+            </View>
+            <FlatList
+              data={availableExercises}
+              keyExtractor={(item) => item.name}
+              renderItem={({ item }) => (
+                <Pressable
+                  onPress={() => {
+                    setSelectedExercise(item.name);
+                    setExercisePickerOpen(false);
+                  }}
+                  style={[styles.libraryItem, { borderColor: theme.border, backgroundColor: selectedExercise === item.name ? theme.input : theme.card }]}
+                >
+                  <Text style={{ color: theme.text }}>{item.name}</Text>
+                </Pressable>
+              )}
+              ItemSeparatorComponent={() => <View style={{ height: 8 }} />}
+            />
+          </RoundedView>
+        </View>
+      </Modal>
+    </Modal >
+  );
+}
+
+function AppContent() {
+  const isDarkMode = useColorScheme() === 'dark';
+  const theme = useMemo(() => (isDarkMode ? darkTheme : lightTheme), [isDarkMode]);
+
+  const [activeTab, setActiveTab] = useState<'Logger' | 'Today' | 'Progress'>('Logger');
+  const pagesRef = useRef<ScrollView>(null);
+  const { width } = useWindowDimensions();
+  const scrollX = useRef(new Animated.Value(0)).current;
+  const tabs: Array<'Logger' | 'Today' | 'Progress'> = ['Logger', 'Today', 'Progress'];
+  const tabIndex = (t: 'Logger' | 'Today' | 'Progress') => tabs.indexOf(t);
+  useEffect(() => {
+    const idx = tabIndex(activeTab);
+    if (pagesRef.current && idx >= 0) {
+      pagesRef.current.scrollTo({ x: width * idx, animated: true });
+    }
+  }, [activeTab, width]);
+  const [exercises, setExercises] = useState<Exercise[]>([]);
+  const [exerciseName, setExerciseName] = useState('');
+  const [selectedBodyPart, setSelectedBodyPart] = useState<BodyPart>('Chest');
+  const [libraryOpen, setLibraryOpen] = useState(false);
+  const [libraryFilter, setLibraryFilter] = useState<BodyPart | 'All'>('All');
+  const [bodyPartPickerOpen, setBodyPartPickerOpen] = useState(false);
+  const [addExerciseModalVisible, setAddExerciseModalVisible] = useState(false);
+  const [profileMenuVisible, setProfileMenuVisible] = useState(false);
+  const [workoutLogVisible, setWorkoutLogVisible] = useState(false);
+  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [expandedExerciseId, setExpandedExerciseId] = useState<string | null>(null);
+
+  const handleAddExercise = (data: { name: string; bodyPart: BodyPart; sets: number; reps: number; weight: number; timestamp: number }) => {
+    const newSets: SetItem[] = Array.from({ length: data.sets }).map(() => ({
+      id: `${data.timestamp}-${Math.random().toString(36).slice(2, 7)}`,
+      reps: data.reps,
+      weight: data.weight,
+    }));
+
+    const newExercise: Exercise = {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      name: data.name,
+      bodyPart: data.bodyPart,
+      sets: newSets,
+      timestamp: data.timestamp,
+    };
+    setExercises(prev => [newExercise, ...prev]);
+  };
+
+  const { totalVolume, totalSets, totalReps } = useMemo(() => {
+    let volume = 0;
+    let sets = 0;
+    let reps = 0;
+    for (const e of exercises) {
+      for (const s of e.sets) {
+        volume += (Number(s.weight) || 0) * (Number(s.reps) || 0);
+        sets += 1;
+        reps += Number(s.reps) || 0;
+      }
+    }
+    return { totalVolume: volume, totalSets: sets, totalReps: reps };
+  }, [exercises]);
+
+  const dateStr = useMemo(() => {
+    const now = new Date();
+    const weekday = now.toLocaleDateString(undefined, { weekday: 'short' });
+    const d = String(now.getDate()).padStart(2, '0');
+    const m = String(now.getMonth() + 1).padStart(2, '0');
+    return `${weekday} ${d}/${m}`;
+  }, []);
+
+  const weekly = useMemo(() => {
+    const now = new Date();
+    const startOfDay = (d: Date) => {
+      const dd = new Date(d);
+      dd.setHours(0, 0, 0, 0);
+      return dd.getTime();
+    };
+    // Build current calendar week Sun..Sat
+    const weekStart = new Date(now);
+    weekStart.setDate(now.getDate() - now.getDay()); // Sunday
+    weekStart.setHours(0, 0, 0, 0);
+    const days: { label: string; start: number; end: number; volume: number }[] = [];
+    for (let i = 0; i < 7; i++) {
+      const day = new Date(weekStart);
+      day.setDate(weekStart.getDate() + i);
+      const start = startOfDay(day);
+      const end = start + 24 * 60 * 60 * 1000 - 1;
+      const label = day.toLocaleDateString(undefined, { weekday: 'short' });
+      days.push({ label, start, end, volume: 0 });
+    }
+    // Aggregate using set id timestamp prefix
+    for (const e of exercises) {
+      for (const s of e.sets) {
+        const ts = Number(String(s.id).split('-')[0]);
+        const vol = (Number(s.weight) || 0) * (Number(s.reps) || 0);
+        if (!Number.isFinite(ts)) continue;
+        const idx = days.findIndex(d => ts >= d.start && ts <= d.end);
+        if (idx >= 0) days[idx].volume += vol;
+      }
+    }
+    const step = 500;
+    const rawMax = Math.max(1, ...days.map(d => d.volume));
+    const minTop = step * 6; // at least show 0..3000
+    const max = Math.max(minTop, Math.ceil(rawMax / step) * step);
+    const ticks: number[] = [];
+    for (let v = 0; v <= max; v += step) ticks.push(v);
+    const rangeStart = days[0]?.start ?? 0;
+    const rangeEnd = days[6]?.end ?? 0;
+    return { days, max, ticks, step, rangeStart, rangeEnd };
+  }, [exercises]);
+
+  const muscleBreakdown = useMemo(() => {
+    const counts = new Map<BodyPart, number>();
+    let total = 0;
+    for (const e of exercises) {
+      for (const s of e.sets) {
+        const ts = Number(String(s.id).split('-')[0]);
+        if (!Number.isFinite(ts)) continue;
+        if (ts >= weekly.rangeStart && ts <= weekly.rangeEnd) {
+          counts.set(e.bodyPart as BodyPart, (counts.get(e.bodyPart as BodyPart) || 0) + 1);
+          total += 1;
+        }
+      }
+    }
+    const entries = Array.from(counts.entries())
+      .map(([bp, c]) => ({ bp, c, pct: total ? Math.round((c / total) * 100) : 0 }))
+      .sort((a, b) => b.c - a.c);
+    const text = entries.length
+      ? entries.map(x => `${x.bp} ${x.pct}%`).join(', ')
+      : 'No sets this week';
+    // Build fixed order dataset for radar (Chest, Back, Legs, Shoulders, Arms, Abs)
+    const order: BodyPart[] = ['Chest', 'Back', 'Legs', 'Shoulders', 'Arms', 'Core'];
+    const countsBy = order.map(bp => counts.get(bp) || 0);
+    const maxCount = Math.max(1, ...countsBy);
+    const values = countsBy.map(c => (maxCount ? c / maxCount : 0));
+    return { entries, text, values, order };
+  }, [exercises, weekly.rangeStart, weekly.rangeEnd]);
+
+  const weeklyProgress = useMemo(() => {
+    const weekMs = 7 * 24 * 60 * 60 * 1000;
+    const curStart = weekly.rangeStart;
+    const curEnd = weekly.rangeEnd;
+    const prevStart = curStart - weekMs;
+    const prevEnd = curStart - 1;
+    let curVol = 0;
+    let prevVol = 0;
+    for (const e of exercises) {
+      for (const s of e.sets) {
+        const ts = Number(String(s.id).split('-')[0]);
+        const vol = (Number(s.weight) || 0) * (Number(s.reps) || 0);
+        if (!Number.isFinite(ts)) continue;
+        if (ts >= curStart && ts <= curEnd) curVol += vol;
+        else if (ts >= prevStart && ts <= prevEnd) prevVol += vol;
+      }
+    }
+    const change = prevVol === 0 ? (curVol > 0 ? 100 : 0) : ((curVol - prevVol) / prevVol) * 100;
+    const rounded = Math.round(change);
+    const sign = rounded >= 0 ? '+' : '';
+    let note = 'stable week';
+    if (rounded >= 10) note = 'good progressive overload!';
+    else if (rounded <= -10) note = 'consider deload or consistency';
+    return { curVol, prevVol, rounded };
+  }, [exercises, weekly.rangeStart, weekly.rangeEnd]);
+
+  const addExercise = () => {
+    const name = exerciseName.trim();
+    if (!name) return;
+    const newExercise: Exercise = {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      name,
+      bodyPart: selectedBodyPart,
+      sets: [],
+      timestamp: Date.now(),
+    };
+    setExercises(prev => [newExercise, ...prev]);
+    setExerciseName('');
+  };
+
+  const deleteExercise = (id: string) => {
+    setExercises(prev => prev.filter(e => e.id !== id));
+  };
+
+  const addSet = (exerciseId: string, reps: number, weight: number) => {
+    if (!Number.isFinite(reps) || reps <= 0) return;
+    if (!Number.isFinite(weight) || weight < 0) return;
+    setExercises(prev =>
+      prev.map(e =>
+        e.id === exerciseId
+          ? {
+            ...e,
+            sets: [
+              { id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, reps, weight },
+              ...e.sets,
+            ],
+          }
+          : e,
+      ),
+    );
+  };
+
+  const deleteSet = (exerciseId: string, setId: string) => {
+    setExercises(prev =>
+      prev.map(e =>
+        e.id === exerciseId ? { ...e, sets: e.sets.filter(s => s.id !== setId) } : e,
+      ),
+    );
+  };
+
+  const renderLogger = () => (
+    <>
+      <View style={styles.headerRow}>
+        <Pressable
+          style={styles.profileButton}
+          onPress={() => setProfileMenuVisible(true)}
+        >
+          <View style={[styles.profileIconContainer, { backgroundColor: theme.input }]}>
+            <UserIcon color={theme.textSecondary} />
+          </View>
+        </Pressable>
+        <Text style={[styles.title, { color: theme.text }]}>Logger</Text>
+        <Text style={[styles.dateText, { color: theme.text }]}>{dateStr}</Text>
+      </View>
+      <Text style={[styles.subtitle, { color: theme.muted }]}>Track your workouts, one exercise at a time.</Text>
+
+      <View style={styles.loggerCenteredContent}>
+        <Pressable
+          onPress={() => setAddExerciseModalVisible(true)}
+          style={({ pressed }) => [
+            styles.addExerciseCardLarge,
+            { backgroundColor: theme.card, borderColor: theme.border, opacity: pressed ? 0.95 : 1 }
+          ]}
+        >
+          <View style={[styles.plusIconLarge, { backgroundColor: theme.accent }]}>
+            <Svg width={32} height={32} viewBox="0 0 24 24" fill="none" stroke={theme.onAccent} strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
+              <Line x1="12" y1="5" x2="12" y2="19" />
+              <Line x1="5" y1="12" x2="19" y2="12" />
+            </Svg>
+          </View>
+          <Text style={[styles.addExerciseTextLarge, { color: theme.text }]}>Add Exercise</Text>
+          <Text style={[styles.addExerciseHint, { color: theme.muted }]}>Log your workout here</Text>
+        </Pressable>
+      </View>
+
+      <AddExerciseSheet
+        visible={addExerciseModalVisible}
+        onClose={() => setAddExerciseModalVisible(false)}
+        theme={theme}
+        onAdd={handleAddExercise}
+      />
+    </>
+  );
+
+  const renderToday = () => {
+    // Filter today's exercises
+    const today = new Date();
+    const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
+    const endOfToday = startOfToday + 24 * 60 * 60 * 1000 - 1;
+
+    const todayExercises = exercises.filter(e => e.timestamp >= startOfToday && e.timestamp <= endOfToday);
+
+    // Calculate today's stats
+    const todayStats = todayExercises.reduce((acc, e) => {
+      const setsCount = e.sets.length;
+      const volume = e.sets.reduce((sum, s) => sum + (s.reps * s.weight), 0);
+      return {
+        exercises: acc.exercises + 1,
+        sets: acc.sets + setsCount,
+        volume: acc.volume + volume,
+      };
+    }, { exercises: 0, sets: 0, volume: 0 });
+
+    const formatTime = (timestamp: number) => {
+      const date = new Date(timestamp);
+      const hours = date.getHours();
+      const minutes = date.getMinutes();
+      const ampm = hours >= 12 ? 'PM' : 'AM';
+      const displayHours = hours % 12 || 12;
+      return `${displayHours}:${minutes.toString().padStart(2, '0')} ${ampm}`;
+    };
+
+    return (
+      <>
+        <View style={styles.headerRow}>
+          <Pressable
+            style={styles.profileButton}
+            onPress={() => setProfileMenuVisible(true)}
+          >
+            <View style={[styles.profileIconContainer, { backgroundColor: theme.input }]}>
+              <UserIcon color={theme.textSecondary} />
+            </View>
+          </Pressable>
+          <Text style={[styles.title, { color: theme.text }]}>Today</Text>
+          <Text style={[styles.dateText, { color: theme.text }]}>{dateStr}</Text>
+        </View>
+        <Text style={[styles.subtitle, { color: theme.muted }]}>Your workout summary for today.</Text>
+
+        {/* Stats Summary */}
+        {todayExercises.length > 0 && (
+          <View style={[styles.todayStatsCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
+            <View style={styles.todayStatItem}>
+              <Text style={[styles.todayStatValue, { color: theme.accent }]}>{todayStats.exercises}</Text>
+              <Text style={[styles.todayStatLabel, { color: theme.textSecondary }]}>Exercises</Text>
+            </View>
+            <View style={[styles.todayStatDivider, { backgroundColor: theme.border }]} />
+            <View style={styles.todayStatItem}>
+              <Text style={[styles.todayStatValue, { color: theme.accent }]}>{todayStats.sets}</Text>
+              <Text style={[styles.todayStatLabel, { color: theme.textSecondary }]}>Sets</Text>
+            </View>
+            <View style={[styles.todayStatDivider, { backgroundColor: theme.border }]} />
+            <View style={styles.todayStatItem}>
+              <Text style={[styles.todayStatValue, { color: theme.accent }]}>{todayStats.volume}</Text>
+              <Text style={[styles.todayStatLabel, { color: theme.textSecondary }]}>Volume (kg)</Text>
+            </View>
+          </View>
+        )}
+
+        {/* Exercise List */}
+        {todayExercises.length === 0 ? (
+          <View style={[styles.todayEmptyState, { backgroundColor: theme.card, borderColor: theme.border }]}>
+            <View style={[styles.todayEmptyIcon, { backgroundColor: theme.input }]}>
+              <Svg width={40} height={40} viewBox="0 0 24 24" fill="none" stroke={theme.textSecondary} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
+                <Path d="M6.5 6.5l11 11" />
+                <Path d="M21 21l-1-1" />
+                <Path d="M3 3l1 1" />
+                <Path d="M18 22l4-4" />
+                <Path d="M2 6l4-4" />
+                <Path d="M3 10l7-7" />
+                <Path d="M14 21l7-7" />
+              </Svg>
+            </View>
+            <Text style={[styles.todayEmptyTitle, { color: theme.text }]}>No workouts logged today</Text>
+            <Text style={[styles.todayEmptySubtitle, { color: theme.muted }]}>Head to Logger to add your first exercise</Text>
+          </View>
+        ) : (
+          <FlatList
+            data={todayExercises}
+            keyExtractor={item => item.id}
+            scrollEnabled={false}
+            renderItem={({ item }) => (
+              <RoundedView style={[styles.todayExerciseCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
+                <View style={styles.todayExerciseHeader}>
+                  <View style={styles.row}>
+                    <Text style={[styles.todayExerciseName, { color: theme.text }]}>{item.name}</Text>
+                    <View style={[styles.badge, { backgroundColor: theme.input, borderColor: theme.border }]}>
+                      <Text style={[styles.badgeText, { color: theme.textSecondary }]}>{item.bodyPart}</Text>
+                    </View>
+                  </View>
+                  <Pressable onPress={() => deleteExercise(item.id)}>
+                    <Svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke={theme.danger} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                      <Path d="M3 6h18" />
+                      <Path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                    </Svg>
+                  </Pressable>
+                </View>
+                <Text style={[styles.todayExerciseTime, { color: theme.muted }]}>Added at {formatTime(item.timestamp)}</Text>
+
+                {/* Sets Display */}
+                <View style={styles.todaySetsContainer}>
+                  {item.sets.map(s => (
+                    <View key={s.id} style={[styles.todaySetRow, { backgroundColor: theme.input }]}>
+                      <View style={styles.row}>
+                        <DumbbellIcon color={theme.textSecondary} />
+                        <Text style={[styles.todaySetText, { color: theme.text }]}>{s.reps} reps</Text>
+                      </View>
+                      <View style={styles.row}>
+                        <WeightIcon color={theme.textSecondary} />
+                        <Text style={[styles.todaySetText, { color: theme.text }]}>{s.weight} kg</Text>
+                      </View>
+                    </View>
+                  ))}
+                </View>
+              </RoundedView>
+            )}
+            contentContainerStyle={styles.listContent}
+          />
+        )}
+      </>
+    );
+  };
+
+  const renderProgress = () => (
+    <>
+      <View style={styles.headerRow}>
+        <Pressable
+          style={styles.profileButton}
+          onPress={() => setProfileMenuVisible(true)}
+        >
+          <View style={[styles.profileIconContainer, { backgroundColor: theme.input }]}>
+            <UserIcon color={theme.textSecondary} />
+          </View>
+        </Pressable>
+        <Text style={[styles.title, { color: theme.text }]}>Progress</Text>
+        <Text style={[styles.dateText, { color: theme.text }]}>{dateStr}</Text>
+      </View>
+      <Text style={[styles.subtitle, { color: theme.muted }]}>Your recent volume and sessions will appear here.</Text>
+
+      <RoundedView style={[styles.card, styles.shadowSoft, { backgroundColor: theme.card, borderColor: theme.border }]}>
+        <View style={{ alignItems: 'center' }}>
+          <RadarChart
+            theme={theme}
+            size={240}
+            levels={4}
+            labels={['Chest', 'Back', 'Legs', 'Shoulders', 'Arms', 'Abs']}
+            values={muscleBreakdown.values}
+          />
+        </View>
+      </RoundedView>
+
+      <RoundedView style={[styles.card, styles.shadowSoft, { backgroundColor: theme.card, borderColor: theme.border }]}>
+        <View style={styles.statsRow}>
+          <View>
+            <Text style={[styles.statsLabel, { color: theme.text }]}>Total Volume</Text>
+            <Text style={[styles.statsSub, { color: theme.muted }]}>Weight × Reps × Sets</Text>
+          </View>
+          <Text style={[styles.statsValue, { color: theme.text }]}>
+            Today: <Text style={styles.emph}>{Intl.NumberFormat().format(totalVolume)} kg</Text> lifted
+          </Text>
+        </View>
+        <View style={[styles.statsRow, { borderTopColor: theme.border }]}>
+          <View>
+            <Text style={[styles.statsLabel, { color: theme.text }]}>Total Sets & Reps</Text>
+            <Text style={[styles.statsSub, { color: theme.muted }]}>Session workload</Text>
+          </View>
+          <Text style={[styles.statsValue, { color: theme.text }]}>
+            You did <Text style={styles.emph}>{totalSets} sets</Text> today
+          </Text>
+        </View>
+      </RoundedView>
+
+      <RoundedView style={[styles.card, styles.shadowSoft, { backgroundColor: theme.card, borderColor: theme.border }]}>
+        <View style={styles.statsRow}>
+          <View>
+            <Text style={[styles.statsLabel, { color: theme.text }]}>Weekly Volume Progress</Text>
+            <Text style={[styles.statsSub, { color: theme.muted }]}>Whether training is increasing</Text>
+          </View>
+          {(() => {
+            const pct = weeklyProgress.rounded;
+            const sign = pct >= 0 ? '+' : '';
+            const green = (theme.bg === '#000000') ? '#30D158' : '#34C759';
+            const red = (theme.bg === '#000000') ? '#FF453A' : '#FF3B30';
+            const color = pct > 0 ? green : pct < 0 ? red : theme.muted;
+            return (
+              <Text style={[styles.statsValue, { color, fontSize: 18, fontWeight: '800' }]}>
+                {`${sign}${pct}%`}
+              </Text>
+            );
+          })()}
+        </View>
+      </RoundedView>
+
+      <RoundedView style={[styles.card, styles.shadowSoft, { backgroundColor: theme.card, borderColor: theme.border }]}>
+        <View style={[styles.cardHeader, { marginBottom: 0 }]}>
+          <Text style={[styles.cardTitle, { color: theme.textSecondary }]}>Weekly Volume</Text>
+        </View>
+        <View style={styles.chartWithAxis}>
+          <View style={styles.yAxis}>
+            {[...weekly.ticks].reverse().map((v) => (
+              <View key={v} style={[styles.yTickRow, { borderColor: theme.border }]}>
+                <Text style={[styles.yTickLabel, { color: theme.muted }]}>{v}</Text>
+              </View>
+            ))}
+          </View>
+          <View style={styles.chartArea}>
+            <View style={styles.chartContainer}>
+              {weekly.days.map((d, i) => {
+                const h = Math.max(4, Math.round((d.volume / weekly.max) * CHART_H));
+                return (
+                  <View key={i} style={styles.chartBar}>
+                    <View style={[styles.chartBarTrack, { backgroundColor: theme.input, borderColor: theme.border }]}>
+                      <View style={[styles.chartBarFill, { height: h, backgroundColor: theme.accent }]} />
+                    </View>
+                    <Text style={[styles.chartBarLabel, { color: theme.muted }]}>{d.label}</Text>
+                  </View>
+                );
+              })}
+            </View>
+          </View>
+        </View>
+      </RoundedView>
+
+
+    </>
+  );
+
+  const renderWorkoutLog = () => {
+    // Calendar helper functions
+    const getDaysInMonth = (year: number, month: number) => {
+      return new Date(year, month + 1, 0).getDate();
+    };
+
+    const getFirstDayOfMonth = (year: number, month: number) => {
+      return new Date(year, month, 1).getDay();
+    };
+
+    const formatMonthYear = (date: Date) => {
+      const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+      return `${months[date.getMonth()]} ${date.getFullYear()}`;
+    };
+
+    const isSameDay = (date1: Date, date2: Date) => {
+      return date1.getDate() === date2.getDate() &&
+        date1.getMonth() === date2.getMonth() &&
+        date1.getFullYear() === date2.getFullYear();
+    };
+
+    const hasWorkoutsOnDate = (date: Date) => {
+      const startOfDay = new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+      const endOfDay = startOfDay + 24 * 60 * 60 * 1000 - 1;
+      return exercises.some(e => e.timestamp >= startOfDay && e.timestamp <= endOfDay);
+    };
+
+    const getWorkoutsForDate = (date: Date) => {
+      const startOfDay = new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+      const endOfDay = startOfDay + 24 * 60 * 60 * 1000 - 1;
+      return exercises.filter(e => e.timestamp >= startOfDay && e.timestamp <= endOfDay);
+    };
+
+    // Build calendar grid
+    const year = currentMonth.getFullYear();
+    const month = currentMonth.getMonth();
+    const daysInMonth = getDaysInMonth(year, month);
+    const firstDay = getFirstDayOfMonth(year, month);
+    const today = new Date();
+
+    const calendarDays: (number | null)[] = [];
+    for (let i = 0; i < firstDay; i++) {
+      calendarDays.push(null);
+    }
+    for (let day = 1; day <= daysInMonth; day++) {
+      calendarDays.push(day);
+    }
+
+    const selectedWorkouts = getWorkoutsForDate(selectedDate);
+    const workoutStats = selectedWorkouts.reduce((acc, e) => ({
+      exercises: acc.exercises + 1,
+      duration: acc.duration + (e.sets.length * 2), // Estimate 2 mins per set
+    }), { exercises: 0, duration: 0 });
+
+    const navigateMonth = (direction: number) => {
+      const newMonth = new Date(currentMonth);
+      newMonth.setMonth(newMonth.getMonth() + direction);
+      setCurrentMonth(newMonth);
+    };
+
+    return (
+      <Modal visible={workoutLogVisible} animationType="slide" onRequestClose={() => setWorkoutLogVisible(false)}>
+        <SafeAreaView style={{ flex: 1, backgroundColor: theme.bg }} edges={['top', 'bottom']}>
+          <View style={[styles.container, { backgroundColor: theme.bg }]}>
+            <ScrollView contentContainerStyle={styles.scrollContent}>
+              {/* Header */}
+              <View style={styles.workoutLogHeader}>
+                <Pressable onPress={() => setWorkoutLogVisible(false)} style={styles.workoutLogBackButton}>
+                  <Svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke={theme.text} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                    <Path d="M19 12H5M12 19l-7-7 7-7" />
+                  </Svg>
+                </Pressable>
+                <Text style={[styles.workoutLogTitle, { color: theme.text }]}>Workout Log</Text>
+                <View style={{ width: 24 }} />
+              </View>
+
+              {/* Month Navigation */}
+              <View style={styles.monthNavigation}>
+                <Pressable onPress={() => navigateMonth(-1)} style={styles.monthNavButton}>
+                  <Svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke={theme.text} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                    <Path d="M15 18l-6-6 6-6" />
+                  </Svg>
+                </Pressable>
+                <Text style={[styles.monthText, { color: theme.text }]}>{formatMonthYear(currentMonth)}</Text>
+                <Pressable onPress={() => navigateMonth(1)} style={styles.monthNavButton}>
+                  <Svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke={theme.text} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                    <Path d="M9 18l6-6-6-6" />
+                  </Svg>
+                </Pressable>
+              </View>
+
+              {/* Calendar Grid */}
+              <View style={[styles.calendarContainer, { backgroundColor: theme.card, borderColor: theme.border }]}>
+                {/* Day Headers */}
+                <View style={styles.calendarHeader}>
+                  {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((day, i) => (
+                    <Text key={i} style={[styles.calendarDayHeader, { color: theme.textSecondary }]}>{day}</Text>
+                  ))}
+                </View>
+
+                {/* Calendar Days */}
+                <View style={styles.calendarGrid}>
+                  {calendarDays.map((day, index) => {
+                    if (day === null) {
+                      return <View key={`empty-${index}`} style={styles.calendarDayCell} />;
+                    }
+
+                    const cellDate = new Date(year, month, day);
+                    const isToday = isSameDay(cellDate, today);
+                    const isSelected = isSameDay(cellDate, selectedDate);
+                    const hasWorkouts = hasWorkoutsOnDate(cellDate);
+
+                    return (
+                      <Pressable
+                        key={day}
+                        style={styles.calendarDayCell}
+                        onPress={() => setSelectedDate(cellDate)}
+                      >
+                        <View style={[
+                          styles.calendarDay,
+                          isSelected && styles.calendarDaySelected,
+                          isSelected && { backgroundColor: theme.text },
+                          isToday && !isSelected && styles.calendarDayToday,
+                          isToday && !isSelected && { borderColor: theme.text },
+                        ]}>
+                          <Text style={[
+                            styles.calendarDayText,
+                            { color: isSelected ? theme.bg : theme.text },
+                          ]}>{day}</Text>
+                        </View>
+                        {hasWorkouts && !isSelected && (
+                          <View style={[styles.workoutIndicator, { backgroundColor: theme.accent }]} />
+                        )}
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              </View>
+
+              {/* Workouts for Selected Date */}
+              <Text style={[styles.workoutDateTitle, { color: theme.text }]}>
+                Workouts for {formatMonthYear(selectedDate)} {selectedDate.getDate()}
+              </Text>
+
+              {selectedWorkouts.length === 0 ? (
+                <View style={[styles.noWorkoutsContainer, { backgroundColor: theme.card, borderColor: theme.border }]}>
+                  <Text style={[styles.noWorkoutsText, { color: theme.muted }]}>No workouts logged on this day</Text>
+                </View>
+              ) : (
+                selectedWorkouts.map(exercise => {
+                  const isExpanded = expandedExerciseId === exercise.id;
+                  return (
+                    <Pressable
+                      key={exercise.id}
+                      onPress={() => setExpandedExerciseId(isExpanded ? null : exercise.id)}
+                    >
+                      <RoundedView style={[styles.workoutLogCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
+                        <View style={styles.workoutLogCardHeader}>
+                          <View style={styles.workoutLogCardIcon}>
+                            <DumbbellIcon color={theme.text} />
+                          </View>
+                          <View style={{ flex: 1 }}>
+                            <Text style={[styles.workoutLogCardTitle, { color: theme.text }]}>{exercise.name}</Text>
+                            <Text style={[styles.workoutLogCardSubtitle, { color: theme.textSecondary }]}>
+                              {exercise.sets.length} Sets • {exercise.bodyPart}
+                            </Text>
+                          </View>
+                          <View style={{ transform: [{ rotate: isExpanded ? '90deg' : '0deg' }] }}>
+                            <Svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke={theme.textSecondary} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                              <Path d="M9 18l6-6-6-6" />
+                            </Svg>
+                          </View>
+                        </View>
+                        {isExpanded && (
+                          <View style={{ marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: theme.border }}>
+                            {exercise.sets.map((set, index) => (
+                              <View key={set.id} style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
+                                <Text style={{ color: theme.text, fontWeight: '600' }}>Set {index + 1}</Text>
+                                <Text style={{ color: theme.textSecondary }}>{set.reps} reps × {set.weight} kg</Text>
+                              </View>
+                            ))}
+                          </View>
+                        )}
+                      </RoundedView>
+                    </Pressable>
+                  );
+                })
+              )}
+            </ScrollView>
+          </View>
+        </SafeAreaView>
+      </Modal >
+    );
+  };
+
+  return (
+    <View style={[styles.container, { backgroundColor: theme.bg }]}>
+      <Animated.ScrollView
+        ref={pagesRef}
+        horizontal
+        pagingEnabled
+        showsHorizontalScrollIndicator={false}
+        decelerationRate="fast"
+        scrollEventThrottle={16}
+        onScroll={Animated.event(
+          [{ nativeEvent: { contentOffset: { x: scrollX } } }],
+          { useNativeDriver: true }
+        )}
+        onMomentumScrollEnd={(e) => {
+          const page = Math.round(e.nativeEvent.contentOffset.x / Math.max(1, width));
+          const next = tabs[Math.min(tabs.length - 1, Math.max(0, page))];
+          if (next && next !== activeTab) setActiveTab(next);
+        }}
+      >
+        <Animated.View style={{ width, opacity: scrollX.interpolate({ inputRange: [-width, 0, width], outputRange: [0.6, 1, 0.6], extrapolate: 'clamp' }), transform: [{ scale: scrollX.interpolate({ inputRange: [-width, 0, width], outputRange: [0.98, 1, 0.98], extrapolate: 'clamp' }) }] }}>
+          <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+            {renderLogger()}
+          </ScrollView>
+        </Animated.View>
+        <Animated.View style={{ width, opacity: scrollX.interpolate({ inputRange: [0, width, 2 * width], outputRange: [0.6, 1, 0.6], extrapolate: 'clamp' }), transform: [{ scale: scrollX.interpolate({ inputRange: [0, width, 2 * width], outputRange: [0.98, 1, 0.98], extrapolate: 'clamp' }) }] }}>
+          <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+            {renderToday()}
+          </ScrollView>
+        </Animated.View>
+        <Animated.View style={{ width, opacity: scrollX.interpolate({ inputRange: [width, 2 * width, 3 * width], outputRange: [0.6, 1, 0.6], extrapolate: 'clamp' }), transform: [{ scale: scrollX.interpolate({ inputRange: [width, 2 * width, 3 * width], outputRange: [0.98, 1, 0.98], extrapolate: 'clamp' }) }] }}>
+          <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+            {renderProgress()}
+          </ScrollView>
+        </Animated.View>
+      </Animated.ScrollView>
+
+      <SafeAreaView edges={['bottom']} style={{ backgroundColor: theme.card }}>
+        <View style={[styles.tabBar, { borderColor: theme.border, backgroundColor: theme.card }]}>
+          {(['Logger', 'Today', 'Progress'] as const).map(tab => (
+            <Pressable key={tab} onPress={() => setActiveTab(tab)} style={({ pressed }) => [styles.tabBtn, activeTab === tab && styles.tabBtnActive, { opacity: pressed ? 0.9 : 1, backgroundColor: activeTab === tab ? theme.accent : 'transparent', borderColor: theme.border }]}>
+              <Text style={[styles.tabText, { color: activeTab === tab ? theme.onAccent : theme.textSecondary }]}>{tab}</Text>
+            </Pressable>
+          ))}
+        </View>
+      </SafeAreaView>
+
+      <ProfileMenuDrawer
+        visible={profileMenuVisible}
+        onClose={() => setProfileMenuVisible(false)}
+        theme={theme}
+        onNavigateToLog={() => setWorkoutLogVisible(true)}
+      />
+
+      {renderWorkoutLog()}
+    </View>
+  );
+}
+
+function DumbbellIcon({ color }: { color: string }) {
+  return (
+    <Svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+      <Path d="M6.5 6.5l11 11" />
+      <Path d="M21 21l-1-1" />
+      <Path d="M3 3l1 1" />
+      <Path d="M18 22l4-4" />
+      <Path d="M2 6l4-4" />
+      <Path d="M3 10l7-7" />
+      <Path d="M14 21l7-7" />
+    </Svg>
+  );
+}
+
+function WeightIcon({ color }: { color: string }) {
+  return (
+    <Svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+      <Path d="M12 3v18" />
+      <Path d="M6 21h12" />
+      <Path d="M6 3h12" />
+      <Path d="M3 7h18" />
+      <Path d="M3 17h18" />
+    </Svg>
+  );
+}
+
+function ExerciseCard({
+  exercise,
+  theme,
+  onDelete,
+  onAddSet,
+  onDeleteSet,
+}: {
+  exercise: Exercise;
+  theme: typeof lightTheme;
+  onDelete: () => void;
+  onAddSet: (reps: number, weight: number) => void;
+  onDeleteSet: (setId: string) => void;
+}) {
+  const [repsText, setRepsText] = useState('');
+  const [weightText, setWeightText] = useState('');
+
+  const submitSet = () => {
+    const reps = Number(repsText);
+    const weight = Number(weightText);
+    if (!Number.isFinite(reps) || reps <= 0) return;
+    if (!Number.isFinite(weight) || weight < 0) return;
+    onAddSet(reps, weight);
+    setRepsText('');
+    setWeightText('');
+  };
+
+  return (
+    <RoundedView style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border, padding: 20 }]}>
+      <View style={styles.cardHeader}>
+        <View style={styles.row}>
+          <Text style={[styles.cardTitle, { color: theme.text, fontSize: 22 }]}>{exercise.name}</Text>
+          <View style={[styles.badge, { backgroundColor: theme.input, borderColor: theme.border }]}>
+            <Text style={[styles.badgeText, { color: theme.textSecondary }]}>{exercise.bodyPart}</Text>
+          </View>
+        </View>
+        <Pressable onPress={onDelete} style={({ pressed }) => [styles.iconBtn, { backgroundColor: pressed ? theme.dangerPressed : theme.danger }]}>
+          <Text style={styles.iconText}>Delete</Text>
+        </Pressable>
+      </View>
+
+      <View style={{ gap: 16, marginBottom: 24 }}>
+        <View style={styles.rowInputs}>
+          <View style={{ flex: 1, marginRight: 8 }}>
+            <Text style={[styles.label, { color: theme.textSecondary, marginBottom: 8, fontSize: 13 }]}>Reps</Text>
+            <TextInput
+              placeholder=""
+              placeholderTextColor={theme.muted}
+              keyboardType="number-pad"
+              value={repsText}
+              onChangeText={setRepsText}
+              style={[styles.inputBig, { backgroundColor: theme.card, color: theme.text, borderColor: theme.border, borderRadius: 12 }]}
+              returnKeyType="next"
+            />
+          </View>
+          <View style={{ flex: 1, marginLeft: 8 }}>
+            <Text style={[styles.label, { color: theme.textSecondary, marginBottom: 8, fontSize: 13 }]}>Weight</Text>
+            <TextInput
+              placeholder=""
+              placeholderTextColor={theme.muted}
+              keyboardType="decimal-pad"
+              value={weightText}
+              onChangeText={setWeightText}
+              style={[styles.inputBig, { backgroundColor: theme.card, color: theme.text, borderColor: theme.border, borderRadius: 12 }]}
+              returnKeyType="done"
+              onSubmitEditing={submitSet}
+            />
+          </View>
+        </View>
+
+        <Pressable onPress={submitSet} style={({ pressed }) => [styles.button, styles.buttonFull, { backgroundColor: pressed ? theme.accentPressed : theme.accent, borderRadius: 8, paddingVertical: 16 }]}>
+          <Text style={[styles.buttonText, { color: theme.onAccent, fontSize: 16, fontWeight: '700' }]}>Add Set</Text>
+        </Pressable>
+      </View>
+
+      {exercise.sets.length > 0 && (
+        <View style={styles.setsContainer}>
+          {exercise.sets.map(s => (
+            <RoundedView key={s.id} style={[styles.setRow, { borderColor: 'transparent', backgroundColor: theme.input, paddingVertical: 12, paddingHorizontal: 16 }]}>
+              <View style={styles.row}>
+                <DumbbellIcon color={theme.textSecondary} />
+                <Text style={[styles.setText, { color: theme.text, fontSize: 16, fontWeight: '600' }]}>{s.reps} reps</Text>
+              </View>
+              <View style={styles.row}>
+                <WeightIcon color={theme.textSecondary} />
+                <Text style={[styles.setText, { color: theme.text, fontSize: 16, fontWeight: '600' }]}>{s.weight} kg</Text>
+              </View>
+              <Pressable onPress={() => onDeleteSet(s.id)}>
+                <Svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke={theme.danger} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                  <Path d="M3 6h18" />
+                  <Path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                </Svg>
+              </Pressable>
+            </RoundedView>
+          ))}
+        </View>
+      )}
+    </RoundedView>
+  );
+}
+
+function UserIcon({ color }: { color: string }) {
+  return (
+    <Svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+      <Path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+      <Circle cx="12" cy="7" r="4" />
+    </Svg>
+  );
+}
+
+function FlameIcon({ color }: { color: string }) {
+  return (
+    <Svg width={20} height={20} viewBox="0 0 24 24" fill={color} stroke="none">
+      <Path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z" />
+    </Svg>
+  );
+}
+
+function TrophyIcon({ color }: { color: string }) {
+  return (
+    <Svg width={20} height={20} viewBox="0 0 24 24" fill={color} stroke="none">
+      <Path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6m12 5h1.5a2.5 2.5 0 0 0 0-5H18M6 9V4h12v5M6 9h12M8 20h8m-4-4v4" stroke={color} strokeWidth={2} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
+}
+
+function CalendarIcon({ color }: { color: string }) {
+  return (
+    <Svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+      <Path d="M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z" />
+    </Svg>
+  );
+}
+
+function SettingsIcon({ color }: { color: string }) {
+  return (
+    <Svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+      <Circle cx="12" cy="12" r="3" />
+      <Path d="M12 1v6m0 6v6M5.64 5.64l4.24 4.24m4.24 4.24l4.24 4.24M1 12h6m6 0h6M5.64 18.36l4.24-4.24m4.24-4.24l4.24-4.24" />
+    </Svg>
+  );
+}
+
+function ChevronRightIcon({ color }: { color: string }) {
+  return (
+    <Svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+      <Path d="M9 18l6-6-6-6" />
+    </Svg>
+  );
+}
+
+function ProfileMenuDrawer({
+  visible,
+  onClose,
+  theme,
+  onNavigateToLog,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  theme: typeof lightTheme;
+  onNavigateToLog: () => void;
+}) {
+  const { width: screenWidth } = useWindowDimensions();
+  const drawerWidth = useMemo(() => screenWidth * 0.6, [screenWidth]);
+  const slideAnim = useRef(new Animated.Value(-drawerWidth)).current;
+  const [isAnimating, setIsAnimating] = useState(false);
+
+  useEffect(() => {
+    slideAnim.setValue(-drawerWidth);
+  }, [drawerWidth, slideAnim]);
+
+  useEffect(() => {
+    if (visible) {
+      setIsAnimating(true);
+      Animated.spring(slideAnim, {
+        toValue: 0,
+        useNativeDriver: true,
+        bounciness: 0,
+        speed: 14,
+      }).start();
+    } else {
+      Animated.spring(slideAnim, {
+        toValue: -drawerWidth,
+        useNativeDriver: true,
+        bounciness: 0,
+        speed: 16,
+      }).start(() => setIsAnimating(false));
+    }
+  }, [visible, slideAnim, drawerWidth]);
+
+  if (!visible && !isAnimating) return null;
+
+  return (
+    <Modal visible={visible} onRequestClose={onClose} transparent animationType="fade">
+      <Pressable style={styles.drawerBackdrop} onPress={onClose}>
+        <Animated.View
+          style={[
+            styles.drawerContainer,
+            { backgroundColor: theme.card, transform: [{ translateX: slideAnim }] }
+          ]}
+          onStartShouldSetResponder={() => true}
+          onResponderRelease={(e) => e.stopPropagation()}
+        >
+          {/* Profile Section */}
+          <View style={styles.drawerProfile}>
+            <View style={[styles.drawerAvatar, { backgroundColor: theme.input }]}>
+              <UserIcon color={theme.textSecondary} />
+            </View>
+            <Text style={[styles.drawerName, { color: theme.text }]}>Jordan Smith</Text>
+          </View>
+
+          {/* Divider */}
+          <View style={[styles.drawerDivider, { backgroundColor: theme.border }]} />
+
+          {/* Stats Section */}
+          <View style={styles.drawerStats}>
+            <View style={styles.drawerStatItem}>
+              <FlameIcon color="#FF9500" />
+              <Text style={[styles.drawerStatLabel, { color: theme.textSecondary }]}>Streak</Text>
+            </View>
+            <Text style={[styles.drawerStatValue, { color: theme.text }]}>15 days</Text>
+          </View>
+
+          <View style={styles.drawerStats}>
+            <View style={styles.drawerStatItem}>
+              <TrophyIcon color="#FFD60A" />
+              <Text style={[styles.drawerStatLabel, { color: theme.textSecondary }]}>Rank</Text>
+            </View>
+            <Text style={[styles.drawerStatValue, { color: theme.text }]}>#GymShark</Text>
+          </View>
+
+          {/* Divider */}
+          <View style={[styles.drawerDivider, { backgroundColor: theme.border }]} />
+
+          {/* Menu Items */}
+          <Pressable style={styles.drawerMenuItem} onPress={() => { onNavigateToLog(); onClose(); }}>
+            <View style={styles.drawerMenuItemLeft}>
+              <CalendarIcon color={theme.text} />
+              <Text style={[styles.drawerMenuItemText, { color: theme.text }]}>Previous Logs</Text>
+            </View>
+            <ChevronRightIcon color={theme.textSecondary} />
+          </Pressable>
+
+          <Pressable style={styles.drawerMenuItem} onPress={() => { }}>
+            <View style={styles.drawerMenuItemLeft}>
+              <SettingsIcon color={theme.text} />
+              <Text style={[styles.drawerMenuItemText, { color: theme.text }]}>Settings</Text>
+            </View>
+            <ChevronRightIcon color={theme.textSecondary} />
+          </Pressable>
+
+          {/* Spacer */}
+          <View style={{ flex: 1 }} />
+
+          {/* Logout Button */}
+          <Pressable
+            style={({ pressed }) => [
+              styles.drawerLogoutButton,
+              { backgroundColor: pressed ? '#111111' : '#000000' }
+            ]}
+            onPress={() => { }}
+          >
+            <Text style={styles.drawerLogoutText}>Logout</Text>
+          </Pressable>
+        </Animated.View>
+      </Pressable>
+    </Modal>
+  );
+}
+
+const lightTheme = {
+  bg: '#F2F2F7', // iOS grouped background
+  text: '#111111',
+  textSecondary: '#3A3A3C',
+  muted: '#8E8E93',
+  card: '#FFFFFF',
+  border: '#E5E5EA',
+  input: '#F2F2F7',
+  accent: '#000000', // primary pill buttons
+  accentPressed: '#111111',
+  onAccent: '#FFFFFF',
+  danger: '#FF3B30',
+  dangerPressed: '#D32F23',
+};
+
+const darkTheme = {
+  bg: '#000000',
+  text: '#FFFFFF',
+  textSecondary: '#D1D1D6',
+  muted: '#8E8E93',
+  card: '#1C1C1E',
+  border: '#2C2C2E',
+  input: '#1C1C1E',
+  accent: '#FFFFFF',
+  accentPressed: '#E5E5EA',
+  onAccent: '#000000',
+  danger: '#FF453A',
+  dangerPressed: '#FF3B30',
+};
+
+const RC = 16; // container radius (cards, rows, modals)
+const RI = 12; // control radius (inputs, chips, buttons)
+const CH = 44; // uniform control height
+const CHART_H = 120; // bar max height in px
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  scrollContent: {
+    padding: 16,
+    paddingBottom: 40,
+  },
+  title: {
+    fontSize: 28,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  subtitle: {
+    fontSize: 14,
+    fontWeight: '500',
+    marginBottom: 12,
+  },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+    marginBottom: 6,
+  },
+  dateText: {
+    fontSize: 14,
+    fontWeight: '700',
+    position: 'absolute',
+    right: 0,
+  },
+  card: {
+    borderRadius: RC,
+    padding: 16,
+    borderWidth: 1,
+    marginBottom: 5,
+    overflow: 'hidden',
+    backgroundColor: '#FFFFFF',
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  chipsRow: {
+    flexDirection: 'row',
+    flexWrap: 'nowrap',
+    gap: 8,
+    marginTop: 10,
+  },
+  cardTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  rowTight: {
+    gap: 0,
+  },
+  trioRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  trioItem: {
+    flex: 1,
+    height: CH,
+  },
+  trioButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  setInputsRow: {
+    flex: 0.72,
+    flexDirection: 'row',
+    gap: 5,
+  },
+  column: {
+    flexDirection: 'column',
+    gap: 10,
+  },
+  actionsRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  actionsRowTwo: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  gapSmall: {
+    gap: 8,
+  },
+  input: {
+    flex: 1,
+    borderWidth: 1,
+    borderRadius: RI,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    fontSize: 16,
+    overflow: 'hidden',
+  },
+  inputTop: {
+    marginTop: 12,
+  },
+  inputHalf: {
+    flex: 0.5,
+  },
+  button: {
+    paddingHorizontal: 18,
+    paddingVertical: 14,
+    borderRadius: RI,
+    overflow: 'hidden',
+  },
+  buttonFlex: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  buttonFull: {
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  buttonHalf: {
+    flex: 1,
+  },
+  buttonLabel: {
+    fontWeight: '500',
+  },
+  buttonLabelStrong: {
+    fontWeight: '700',
+  },
+  buttonNarrow: {
+    paddingHorizontal: 12,
+  },
+  buttonFixed: {
+    width: 96,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  buttonText: {
+    color: '#ffffff',
+    fontWeight: '600',
+  },
+  badge: {
+    marginLeft: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 999,
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
+  badgeText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  iconBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    overflow: 'hidden',
+  },
+  iconBtnSmall: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    overflow: 'hidden',
+  },
+  iconText: {
+    color: '#ffffff',
+    fontWeight: '600',
+    fontSize: 12,
+  },
+  chip: {
+    borderWidth: 1,
+    borderRadius: RI,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    overflow: 'hidden',
+  },
+  listContent: {
+    paddingBottom: 20,
+  },
+  emptyText: {
+    fontSize: 14,
+  },
+  setsContainer: {
+    gap: 8,
+    marginTop: 8,
+  },
+  setRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    borderWidth: 1,
+    borderRadius: RC,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 2,
+  },
+  setText: {
+    fontSize: 14,
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalCard: {
+    maxHeight: '75%',
+    borderTopLeftRadius: RC,
+    borderTopRightRadius: RC,
+    padding: 16,
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
+  shadowSoft: {
+    shadowColor: '#000',
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 2,
+  },
+  libraryItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderWidth: 1,
+    borderRadius: RC,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    overflow: 'hidden',
+  },
+  tabBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderTopWidth: 1,
+  },
+  tabBtn: {
+    flex: 1,
+    borderWidth: 1,
+    borderRadius: RI,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+  },
+  tabBtnActive: {
+    // background handled inline with theme.accent
+  },
+  tabText: {
+    fontWeight: '700',
+  },
+  // Progress metrics
+  statsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    paddingVertical: 12,
+    borderTopWidth: 1,
+    borderTopColor: 'transparent',
+  },
+  statsLabel: {
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  statsSub: {
+    fontSize: 12,
+    fontWeight: '500',
+    opacity: 0.9,
+  },
+  statsValue: {
+    textAlign: 'right',
+    maxWidth: '55%',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  emph: {
+    fontWeight: '800',
+  },
+  // Weekly bar chart
+  chartContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+    gap: 8,
+    paddingTop: 8,
+    height: 160,
+  },
+  chartBar: {
+    flex: 1,
+    alignItems: 'center',
+    gap: 6,
+  },
+  chartBarTrack: {
+    width: 18,
+    height: 130,
+    borderRadius: 10,
+    borderWidth: 1,
+    overflow: 'hidden',
+    justifyContent: 'flex-end',
+  },
+  chartBarFill: {
+    width: '100%',
+    borderRadius: 10,
+  },
+  chartBarLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  chartWithAxis: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  yAxis: {
+    width: 44,
+    height: 160,
+    paddingTop: 8,
+    justifyContent: 'space-between',
+  },
+  yTickRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderTopWidth: 0,
+    paddingTop: 2,
+  },
+  yTickLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  chartArea: {
+    flex: 1,
+    height: 160,
+    position: 'relative',
+  },
+  yGrid: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
+    justifyContent: 'space-between',
+  },
+  gridLine: {
+    borderTopWidth: 1,
+  },
+  // New UI Styles
+  addExerciseCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 16,
+    borderRadius: RC,
+    borderWidth: 1,
+    marginBottom: 16,
+  },
+  addExerciseText: {
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  plusIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  // Bottom Sheet
+  bottomSheet: {
+    borderTopLeftRadius: RC,
+    borderTopRightRadius: RC,
+    padding: 24,
+    borderWidth: 1,
+    width: '100%',
+    maxHeight: '80%',
+  },
+  sheetHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 24,
+  },
+  sheetTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+  },
+  dateTimeText: {
+    fontSize: 12,
+    fontWeight: '500',
+    marginTop: 4,
+  },
+  closeButton: {
+    padding: 4,
+  },
+  sheetContent: {
+    gap: 16,
+  },
+  label: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  dropdown: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 16,
+    borderRadius: RI,
+    borderWidth: 1,
+  },
+  rowInputs: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  inputBig: {
+    borderWidth: 1,
+    borderRadius: RI,
+    paddingHorizontal: 20,
+    paddingVertical: 18,
+    fontSize: 18,
+    overflow: 'hidden',
+    minWidth: 120,
+  },
+  // Swipe Button
+  swipeButtonContainer: {
+    height: 56,
+    borderRadius: 28,
+    borderWidth: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  swipeText: {
+    fontWeight: '600',
+    fontSize: 16,
+  },
+  swipeKnob: {
+    position: 'absolute',
+    left: 4,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  // Profile Button
+  profileButton: {
+    position: 'absolute',
+    left: 0,
+    zIndex: 10,
+  },
+  profileIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  // Drawer Menu
+  drawerBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-start',
+  },
+  drawerContainer: {
+    width: '60%',
+    height: '100%',
+    padding: 24,
+    shadowColor: '#000',
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    shadowOffset: { width: 2, height: 0 },
+    elevation: 5,
+  },
+  drawerProfile: {
+    alignItems: 'center',
+    marginBottom: 24,
+    marginTop: 20,
+  },
+  drawerAvatar: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  drawerName: {
+    fontSize: 24,
+    fontWeight: '700',
+  },
+  drawerDivider: {
+    height: 1,
+    marginVertical: 20,
+  },
+  drawerStats: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
+  drawerStatItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  drawerStatLabel: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  drawerStatValue: {
+    fontSize: 20,
+    fontWeight: '700',
+  },
+  drawerMenuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 16,
+  },
+  drawerMenuItemLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  drawerMenuItemText: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  drawerLogoutButton: {
+    paddingVertical: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 20,
+  },
+  drawerLogoutText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  // Logger Page Styles
+  loggerCenteredContent: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 60,
+  },
+  addExerciseCardLarge: {
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 40,
+    borderRadius: RC,
+    borderWidth: 2,
+    gap: 16,
+    minWidth: 280,
+  },
+  plusIconLarge: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  addExerciseTextLarge: {
+    fontSize: 24,
+    fontWeight: '700',
+  },
+  addExerciseHint: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  // Today Page Styles
+  todayStatsCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-around',
+    padding: 20,
+    borderRadius: RC,
+    borderWidth: 1,
+    marginBottom: 16,
+  },
+  todayStatItem: {
+    alignItems: 'center',
+    gap: 4,
+  },
+  todayStatValue: {
+    fontSize: 28,
+    fontWeight: '800',
+  },
+  todayStatLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+  },
+  todayStatDivider: {
+    width: 1,
+    height: 40,
+  },
+  todayEmptyState: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 48,
+    borderRadius: RC,
+    borderWidth: 1,
+    gap: 16,
+  },
+  todayEmptyIcon: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  todayEmptyTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+  },
+  todayEmptySubtitle: {
+    fontSize: 14,
+    fontWeight: '500',
+    textAlign: 'center',
+  },
+  todayExerciseCard: {
+    padding: 20,
+    borderRadius: RC,
+    borderWidth: 1,
+    marginBottom: 12,
+    gap: 12,
+  },
+  todayExerciseHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  todayExerciseName: {
+    fontSize: 20,
+    fontWeight: '700',
+  },
+  todayExerciseTime: {
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  todaySetsContainer: {
+    gap: 8,
+    marginTop: 8,
+  },
+  todaySetRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+  },
+  todaySetText: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  // Workout Log Page Styles
+  workoutLogHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 24,
+  },
+  workoutLogBackButton: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  workoutLogTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+  },
+  monthNavigation: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 20,
+  },
+  monthNavButton: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  monthText: {
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  calendarContainer: {
+    borderRadius: RC,
+    borderWidth: 1,
+    padding: 16,
+    marginBottom: 24,
+  },
+  calendarHeader: {
+    flexDirection: 'row',
+    marginBottom: 16,
+  },
+  calendarDayHeader: {
+    flex: 1,
+    textAlign: 'center',
+    fontSize: 12,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+  },
+  calendarGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+  },
+  calendarDayCell: {
+    width: '14.28%',
+    aspectRatio: 1,
+    padding: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  calendarDay: {
+    width: '100%',
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 20,
+  },
+  calendarDaySelected: {
+    backgroundColor: '#000000',
+  },
+  calendarDayToday: {
+    borderWidth: 2,
+  },
+  calendarDayText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  workoutIndicator: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    position: 'absolute',
+    bottom: 8,
+  },
+  workoutDateTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    marginBottom: 16,
+  },
+  noWorkoutsContainer: {
+    padding: 32,
+    borderRadius: RC,
+    borderWidth: 1,
+    alignItems: 'center',
+  },
+  noWorkoutsText: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  workoutLogCard: {
+    padding: 16,
+    borderRadius: RC,
+    borderWidth: 1,
+    marginBottom: 12,
+  },
+  workoutLogCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  workoutLogCardIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  workoutLogCardTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  workoutLogCardSubtitle: {
+    fontSize: 13,
+    fontWeight: '500',
+    marginTop: 2,
+  },
+});
+
+export default App;

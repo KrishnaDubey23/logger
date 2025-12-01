@@ -1,0 +1,153 @@
+{
+  "migIndex": 1,
+  "data": [
+    {
+      "path": "assets/fonts/Bungee-Regular.ttf",
+      "sha1": "985db0d53f7c2f0770e0d2496b73dadf9559e76e"
+    },
+    {
+      "path": "assets/fonts/Inter-Bold.ttf",
+      "sha1": "a109ba909e5838f2c9bbae7a7a0213c384cf0e82"
+    },
+    {
+      "path": "assets/fonts/Inter-Medium.ttf",
+      "sha1": "a41521c03c8f3f93605d0e63f59ebb1d732d45b4"
+    },
+    {
+      "path": "assets/fonts/Inter-Regular.ttf",
+      "sha1": "a61ca4354ccf1d699ecb28cf0bc4be8cf4bfa090"
+    },
+    {
+      "path": "assets/fonts/Inter-SemiBold.ttf",
+      "sha1": "4861c83c6855d8807bb8353e1f869317c7b54ffc"
+    },
+    {
+      "path": "assets/fonts/Montserrat-Black.ttf",
+      "sha1": "e9abe094b65469f6b6a373b543ab7030dc145c7c"
+    },
+    {
+      "path": "assets/fonts/Montserrat-BlackItalic.ttf",
+      "sha1": "3f86120ed3d28bb9aac0fed7a0290a0cfbeff531"
+    },
+    {
+      "path": "assets/fonts/Montserrat-Bold.ttf",
+      "sha1": "8ce62d316d0b9787b1159ae039ba720936b5509a"
+    },
+    {
+      "path": "assets/fonts/Montserrat-BoldItalic.ttf",
+      "sha1": "cd3789ae55cc702776afdd2fd1a81ae16c69fbf4"
+    },
+    {
+      "path": "assets/fonts/Montserrat-ExtraBold.ttf",
+      "sha1": "84f16776e2099d3b57d8ed239b76e6fa3284b2e7"
+    },
+    {
+      "path": "assets/fonts/Montserrat-ExtraBoldItalic.ttf",
+      "sha1": "96c173512f14118a97acf01279fa63bae70c6035"
+    },
+    {
+      "path": "assets/fonts/Montserrat-ExtraLight.ttf",
+      "sha1": "cc7a24a862f1779bdbbf78a6984bb9ae9324a128"
+    },
+    {
+      "path": "assets/fonts/Montserrat-ExtraLightItalic.ttf",
+      "sha1": "b665a8fc9b6d2a4c89ac87fc480561c98bfff4f8"
+    },
+    {
+      "path": "assets/fonts/Montserrat-Italic-VariableFont_wght.ttf",
+      "sha1": "d9e45acca8efc8c5208e6cad279beaced643049f"
+    },
+    {
+      "path": "assets/fonts/Montserrat-Italic.ttf",
+      "sha1": "aef4e6a1af1849644ce1e934b4ab9059e916d887"
+    },
+    {
+      "path": "assets/fonts/Montserrat-Light.ttf",
+      "sha1": "3397cd98e51365c89e95cd1130e0141bda5051de"
+    },
+    {
+      "path": "assets/fonts/Montserrat-LightItalic.ttf",
+      "sha1": "581acfc143788f70c489e9e08b6009baf90adf8e"
+    },
+    {
+      "path": "assets/fonts/Montserrat-Medium.ttf",
+      "sha1": "f0f8c728a65b340691dcd2dd1230e6b7e9e0a8db"
+    },
+    {
+      "path": "assets/fonts/Montserrat-MediumItalic.ttf",
+      "sha1": "3a200dbe415e421ecaca38532d19380920217c39"
+    },
+    {
+      "path": "assets/fonts/Montserrat-Regular.ttf",
+      "sha1": "94617e25439593372f8aebef34947f31f0f2143c"
+    },
+    {
+      "path": "assets/fonts/Montserrat-SemiBold.ttf",
+      "sha1": "2a50c52fc2f206ac4844ad0ce1616aed0ff214f5"
+    },
+    {
+      "path": "assets/fonts/Montserrat-SemiBoldItalic.ttf",
+      "sha1": "8893c19f6daee4348d1e8b2ce0bd4698a5dca0e5"
+    },
+    {
+      "path": "assets/fonts/Montserrat-Thin.ttf",
+      "sha1": "550e6e1d992369e97e9f00aa71ae482a6a6326d7"
+    },
+    {
+      "path": "assets/fonts/Montserrat-ThinItalic.ttf",
+      "sha1": "8d95f4a0cf9f73f72f6b436817a8d434f7ae4e65"
+    },
+    {
+      "path": "assets/fonts/Montserrat-VariableFont_wght.ttf",
+      "sha1": "a917c65005395d25b01713c6e4d6eae54fb80ad1"
+    },
+    {
+      "path": "assets/fonts/OFL.txt",
+      "sha1": "7a155cb46c25149b5ad3cb4aedf87edcced2bba8"
+    },
+    {
+      "path": "assets/fonts/Outfit-Bold.ttf",
+      "sha1": "716ec496196ff59c2e8df92ec2ef630076f8e55c"
+    },
+    {
+      "path": "assets/fonts/Outfit-ExtraBold.ttf",
+      "sha1": "056ba1596742f105ea8c02bd5fee97413f03a601"
+    },
+    {
+      "path": "assets/fonts/Outfit-Medium.ttf",
+      "sha1": "86f494fb726890f8f618a2fb61682fe305ce9797"
+    },
+    {
+      "path": "assets/fonts/Outfit-Regular.ttf",
+      "sha1": "c3ab8885a0e66f58354b414f46df258d993c5747"
+    },
+    {
+      "path": "assets/fonts/Outfit-SemiBold.ttf",
+      "sha1": "0553b7272114f14d67c4c97323b327d9e114b2d0"
+    },
+    {
+      "path": "assets/fonts/PlusJakartaSans-Bold.ttf",
+      "sha1": "8897a080815d6d831437f75c1ff5f70df5ac8be0"
+    },
+    {
+      "path": "assets/fonts/PlusJakartaSans-ExtraBold.ttf",
+      "sha1": "be0200d30a4d28e79fd8fe6026937ca89d5555c4"
+    },
+    {
+      "path": "assets/fonts/PlusJakartaSans-Medium.ttf",
+      "sha1": "f55ad628547bbc9466c36b85182ef0ab3e155d5c"
+    },
+    {
+      "path": "assets/fonts/PlusJakartaSans-Regular.ttf",
+      "sha1": "c32f8a4783591a8efb29d1e8b2ca2ee23081355d"
+    },
+    {
+      "path": "assets/fonts/PlusJakartaSans-SemiBold.ttf",
+      "sha1": "3a7186fa2e62602ae075c4c45c48bb1e81e76dd4"
+    },
+    {
+      "path": "assets/fonts/README.txt",
+      "sha1": "1f00617f4836deba8f0123093561db3967ba4e1a"
+    }
+  ]
+}
