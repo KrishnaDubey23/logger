@@ -74,7 +74,12 @@ const WeightItem = React.memo(({
     );
 });
 
-const WeightSelectionScreen = () => {
+type WeightSelectionScreenProps = {
+    onNext: () => void;
+    onBack?: () => void;
+};
+
+const WeightSelectionScreen: React.FC<WeightSelectionScreenProps> = ({ onNext, onBack }) => {
     const [unit, setUnit] = useState<'kg' | 'lbs'>('kg');
     const baseWeightKg = useRef(70.0); // Source of truth
     const [wholeNumber, setWholeNumber] = useState(70);
@@ -197,7 +202,7 @@ const WeightSelectionScreen = () => {
             <SafeAreaView style={styles.container}>
                 {/* Header */}
                 <View style={styles.header}>
-                    <Pressable style={styles.backButton} onPress={() => console.log('Back')}>
+                    <Pressable style={styles.backButton} onPress={() => (onBack ? onBack() : console.log('Back'))}>
                         <Svg width={24} height={24} viewBox="0 0 24 24" fill="none">
                             <Path d="M15 18L9 12L15 6" stroke="#0F172A" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
                         </Svg>
@@ -301,7 +306,7 @@ const WeightSelectionScreen = () => {
                 <View style={styles.footer}>
                     <Pressable
                         style={({ pressed }) => [styles.continueBtn, pressed && { opacity: 0.9 }]}
-                        onPress={() => console.log('Continue with:', baseWeightKg.current)}
+                        onPress={() => onNext()}
                     >
                         <Text style={styles.continueText}>Continue</Text>
                     </Pressable>

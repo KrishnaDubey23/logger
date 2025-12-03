@@ -37,7 +37,12 @@ const activityOptions = [
     },
 ];
 
-const ActivitySelectionScreen = () => {
+type ActivitySelectionScreenProps = {
+    onNext: () => void;
+    onBack?: () => void;
+};
+
+const ActivitySelectionScreen: React.FC<ActivitySelectionScreenProps> = ({ onNext, onBack }) => {
     const [selectedActivity, setSelectedActivity] = useState<ActivityLevel | null>('sometimes');
 
     return (
@@ -46,7 +51,7 @@ const ActivitySelectionScreen = () => {
                 <View style={styles.contentContainer}>
                     {/* Header */}
                     <View style={styles.header}>
-                        <Pressable style={styles.backButton} onPress={() => console.log('Back')}>
+                        <Pressable style={styles.backButton} onPress={() => (onBack ? onBack() : console.log('Back'))}>
                             <Svg width={24} height={24} viewBox="0 0 24 24" fill="none">
                                 <Path d="M15 18L9 12L15 6" stroke="#0F172A" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
                             </Svg>
@@ -111,7 +116,7 @@ const ActivitySelectionScreen = () => {
                             !selectedActivity && styles.continueBtnDisabled,
                             pressed && selectedActivity && { opacity: 0.9 }
                         ]}
-                        onPress={() => selectedActivity && console.log('Continue with:', selectedActivity)}
+                        onPress={() => selectedActivity && onNext()}
                         disabled={!selectedActivity}
                     >
                         <Text style={styles.continueText}>Continue</Text>

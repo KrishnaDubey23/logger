@@ -17,7 +17,12 @@ const { width } = Dimensions.get('window');
 const RULER_ITEM_WIDTH = 10; // Width of each tick mark area
 const VISIBLE_ITEMS = 20; // Number of items visible on screen
 
-const HeightSelectionScreen = () => {
+type HeightSelectionScreenProps = {
+    onNext: () => void;
+    onBack?: () => void;
+};
+
+const HeightSelectionScreen: React.FC<HeightSelectionScreenProps> = ({ onNext, onBack }) => {
     const [unit, setUnit] = useState<'ft' | 'cm'>('ft');
     const [heightCm, setHeightCm] = useState(178); // Default 5'10" approx
     const [heightInches, setHeightInches] = useState(70); // Default 5'10"
@@ -129,7 +134,7 @@ const HeightSelectionScreen = () => {
         <SafeAreaProvider>
             <SafeAreaView style={styles.container}>
                 <View style={styles.headerContainer}>
-                    <Pressable style={styles.backButton} onPress={() => console.log('Back pressed')}>
+                    <Pressable style={styles.backButton} onPress={() => (onBack ? onBack() : console.log('Back pressed'))}>
                         <Svg width={24} height={24} viewBox="0 0 24 24" fill="none">
                             <Path d="M15 18L9 12L15 6" stroke="#000000" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
                         </Svg>
@@ -196,7 +201,7 @@ const HeightSelectionScreen = () => {
                             styles.continueButton,
                             pressed && { opacity: 0.8 }
                         ]}
-                        onPress={() => console.log('Selected Height:', unit === 'cm' ? `${heightCm}cm` : `${Math.floor(heightInches / 12)}'${heightInches % 12}"`)}
+                        onPress={() => onNext()}
                     >
                         <Text style={styles.continueButtonText}>Continue</Text>
                     </Pressable>

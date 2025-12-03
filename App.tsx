@@ -26,6 +26,14 @@ import {
 } from 'react-native';
 import Svg, { G, Polygon, Line, Circle, Text as SvgText, Path, Rect } from 'react-native-svg';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
+import GenderSelectionScreen from './onboarding/gender';
+import AgeSelectionScreen from './onboarding/age';
+import HeightSelectionScreen from './onboarding/height';
+import WeightSelectionScreen from './onboarding/weight';
+import ActivitySelectionScreen from './onboarding/activity';
+import LoginScreen from './screens/login';
+import SignUpScreen from './screens/signup';
+import StartCarousel from './screens/startCarousel';
 
 // RoundedView: currently behaves like a normal View (continuous corners disabled)
 const USE_CONTINUOUS_CURVE = false;
@@ -217,14 +225,84 @@ const EXERCISE_LIBRARY: Array<{ name: string; bodyPart: BodyPart }> = [
   { name: 'Squat Clean', bodyPart: 'Full Body' },
 ];
 
+type AppStage = 'start' | 'login' | 'signup' | 'onboarding' | 'main';
+
 function App() {
   const isDarkMode = useColorScheme() === 'dark';
+  const [stage, setStage] = useState<AppStage>('start');
+  const [onboardingStep, setOnboardingStep] = useState(0);
+
+  const goNext = () => {
+    setOnboardingStep((prev) => {
+      if (prev < 4) {
+        return prev + 1;
+      }
+      setStage('main');
+      return prev;
+    });
+  };
+
+  const goBack = () => {
+    setOnboardingStep((prev) => (prev > 0 ? prev - 1 : prev));
+  };
+
+  const renderOnboarding = () => {
+    switch (onboardingStep) {
+      case 0:
+        return <GenderSelectionScreen onNext={goNext} />;
+      case 1:
+        return <AgeSelectionScreen onNext={goNext} onBack={goBack} />;
+      case 2:
+        return <HeightSelectionScreen onNext={goNext} onBack={goBack} />;
+      case 3:
+        return <WeightSelectionScreen onNext={goNext} onBack={goBack} />;
+      case 4:
+        return <ActivitySelectionScreen onNext={goNext} onBack={goBack} />;
+      default:
+        return <GenderSelectionScreen onNext={goNext} />;
+    }
+  };
+
+  const handleAuthComplete = () => {
+    setStage('onboarding');
+    setOnboardingStep(0);
+  };
+
+  let content: React.ReactNode;
+  if (stage === 'start') {
+    content = (
+      <StartCarousel
+        onSignUp={() => setStage('signup')}
+        onLogin={() => setStage('login')}
+      />
+    );
+  } else if (stage === 'login') {
+    content = (
+      <LoginScreen
+        onNavigateBack={() => setStage('start')}
+        onNavigateToSignUp={() => setStage('signup')}
+        onAuthComplete={handleAuthComplete}
+      />
+    );
+  } else if (stage === 'signup') {
+    content = (
+      <SignUpScreen
+        onNavigateBack={() => setStage('start')}
+        onNavigateToLogin={() => setStage('login')}
+        onAuthComplete={handleAuthComplete}
+      />
+    );
+  } else if (stage === 'onboarding') {
+    content = renderOnboarding();
+  } else {
+    content = <AppContent />;
+  }
 
   return (
     <SafeAreaProvider>
       <SafeAreaView edges={['top']} style={{ flex: 1 }}>
         <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
-        <AppContent />
+        {content}
       </SafeAreaView>
     </SafeAreaProvider>
   );

@@ -59,7 +59,12 @@ const AgeItem = React.memo(({ item, index, scrollY, itemHeight }: { item: number
     );
 });
 
-const AgeSelectionScreen = () => {
+type AgeSelectionScreenProps = {
+    onNext: () => void;
+    onBack?: () => void;
+};
+
+const AgeSelectionScreen: React.FC<AgeSelectionScreenProps> = ({ onNext, onBack }) => {
     const [selectedAge, setSelectedAge] = useState(23);
     const scrollY = useRef(new Animated.Value(0)).current;
     const flatListRef = useRef<Animated.FlatList<number>>(null);
@@ -103,7 +108,7 @@ const AgeSelectionScreen = () => {
         <SafeAreaProvider>
             <SafeAreaView style={styles.container}>
                 <View style={styles.headerContainer}>
-                    <Pressable style={styles.backButton} onPress={() => console.log('Back pressed')}>
+                    <Pressable style={styles.backButton} onPress={() => (onBack ? onBack() : console.log('Back pressed'))}>
                         <Svg width={24} height={24} viewBox="0 0 24 24" fill="none">
                             <Path d="M15 18L9 12L15 6" stroke="#000000" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
                         </Svg>
@@ -153,7 +158,7 @@ const AgeSelectionScreen = () => {
                             styles.continueButton,
                             pressed && { opacity: 0.8 }
                         ]}
-                        onPress={() => console.log('Selected Age:', selectedAge)}
+                        onPress={() => onNext()}
                     >
                         <Text style={styles.continueButtonText}>Continue</Text>
                     </Pressable>

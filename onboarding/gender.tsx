@@ -13,7 +13,12 @@ const { width } = Dimensions.get('window');
 
 type Gender = 'male' | 'female';
 
-const GenderSelectionScreen = () => {
+type GenderSelectionScreenProps = {
+    onNext: () => void;
+    onBack?: () => void;
+};
+
+const GenderSelectionScreen: React.FC<GenderSelectionScreenProps> = ({ onNext, onBack }) => {
     const [selectedGender, setSelectedGender] = useState<Gender>('male'); // Defaulting to male based on screenshot, or null
 
     return (
@@ -21,7 +26,7 @@ const GenderSelectionScreen = () => {
             <SafeAreaView style={styles.container}>
                 {/* Header */}
                 <View style={styles.header}>
-                    <Pressable style={styles.backButton} onPress={() => console.log('Back')}>
+                    <Pressable style={styles.backButton} onPress={() => (onBack ? onBack() : console.log('Back'))}>
                         <Svg width={24} height={24} viewBox="0 0 24 24" fill="none">
                             <Path d="M15 18L9 12L15 6" stroke="#0F172A" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
                         </Svg>
@@ -105,7 +110,7 @@ const GenderSelectionScreen = () => {
                             styles.continueBtn,
                             pressed && { opacity: 0.9 }
                         ]}
-                        onPress={() => console.log('Continue with:', selectedGender)}
+                        onPress={() => onNext()}
                     >
                         <Text style={styles.continueText}>Continue</Text>
                     </Pressable>
