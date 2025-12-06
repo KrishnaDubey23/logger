@@ -246,10 +246,14 @@ function App() {
     setOnboardingStep((prev) => (prev > 0 ? prev - 1 : prev));
   };
 
+  const goBackFromGender = () => {
+    setStage('signup');
+  };
+
   const renderOnboarding = () => {
     switch (onboardingStep) {
       case 0:
-        return <GenderSelectionScreen onNext={goNext} />;
+        return <GenderSelectionScreen onNext={goNext} onBack={goBackFromGender} />;
       case 1:
         return <AgeSelectionScreen onNext={goNext} onBack={goBack} />;
       case 2:
@@ -295,7 +299,7 @@ function App() {
   } else if (stage === 'onboarding') {
     content = renderOnboarding();
   } else {
-    content = <AppContent />;
+    content = <AppContent onLogout={() => setStage('login')} />;
   }
 
   return (
@@ -902,7 +906,7 @@ function MuscleSkeleton({
     </View>
   );
 }
-function AppContent() {
+function AppContent({ onLogout }: { onLogout: () => void }) {
   const isDarkMode = useColorScheme() === 'dark';
   const theme = useMemo(() => (isDarkMode ? darkTheme : lightTheme), [isDarkMode]);
 
@@ -1665,6 +1669,7 @@ function AppContent() {
         onNavigateToSettings={() => setSettingsScreenVisible(true)}
         onNavigateToRank={() => setRankVisible(true)}
         profile={userProfile}
+        onLogout={onLogout}
       />
 
       {renderWorkoutLog()}
@@ -3716,6 +3721,7 @@ function ProfileMenuDrawer({
   onNavigateToSettings,
   onNavigateToRank,
   profile,
+  onLogout,
 }: {
   visible: boolean;
   onClose: () => void;
@@ -3725,6 +3731,7 @@ function ProfileMenuDrawer({
   onNavigateToSettings: () => void;
   onNavigateToRank: () => void;
   profile: UserProfile;
+  onLogout: () => void;
 }) {
   const { width: screenWidth } = useWindowDimensions();
   const drawerWidth = useMemo(() => screenWidth * 0.6, [screenWidth]);
@@ -3836,7 +3843,10 @@ function ProfileMenuDrawer({
               styles.drawerLogoutButton,
               { backgroundColor: pressed ? '#111111' : '#000000' }
             ]}
-            onPress={() => { }}
+            onPress={() => {
+              onClose();
+              onLogout();
+            }}
           >
             <Text style={styles.drawerLogoutText}>Logout</Text>
           </Pressable>

@@ -1,12 +1,16 @@
 import React from 'react';
-import { View, StyleSheet, Text } from 'react-native';
+import { View, StyleSheet, Text, Image } from 'react-native';
 
 const Start3Screen: React.FC = () => {
     return (
         <View style={styles.container}>
             <View style={styles.illustrationWrapper}>
                 <View style={styles.illustrationCard}>
-                    <View style={styles.illustrationPlaceholder} />
+                    <Image
+                        source={require('../assets/grow.png')}
+                        style={styles.illustrationImage}
+                        resizeMode="contain"
+                    />
                 </View>
             </View>
 
@@ -41,19 +45,14 @@ const styles = StyleSheet.create({
         width: '100%',
         aspectRatio: 1,
         borderRadius: 24,
-        borderWidth: 1,
-        borderColor: '#E5E7EB',
-        backgroundColor: '#F5F5F0',
+        backgroundColor: 'transparent',
         justifyContent: 'center',
         alignItems: 'center',
+        overflow: 'hidden',
     },
-    illustrationPlaceholder: {
-        width: '65%',
-        height: '65%',
-        borderRadius: 16,
-        borderWidth: 2,
-        borderColor: '#111827',
-        borderStyle: 'dashed',
+    illustrationImage: {
+        width: '80%',
+        height: '80%',
     },
     textContainer: {
         marginTop: 40,

@@ -1,12 +1,18 @@
 import React from 'react';
-import { View, StyleSheet, Text } from 'react-native';
+import { View, StyleSheet, Text, Image } from 'react-native';
 
 const Start2Screen: React.FC = () => {
     return (
         <View style={styles.container}>
             <View style={styles.illustrationWrapper}>
                 <View style={styles.illustrationCard}>
-                    <View style={styles.illustrationPlaceholder} />
+                    <View style={styles.illustrationPlaceholder}>
+                        <Image
+                            source={require('../assets/custom.png')}
+                            style={styles.illustrationImage}
+                            resizeMode="contain"
+                        />
+                    </View>
                 </View>
             </View>
 
@@ -37,19 +43,19 @@ const styles = StyleSheet.create({
     illustrationCard: {
         width: '100%',
         aspectRatio: 1,
-        borderRadius: 24,
-        backgroundColor: '#F9CDA4', // peach tone similar to design
         justifyContent: 'center',
         alignItems: 'center',
     },
     illustrationPlaceholder: {
-        width: '55%',
-        height: '55%',
-        borderRadius: 16,
-        borderWidth: 2,
-        borderColor: '#111827',
-        borderStyle: 'dashed',
-        backgroundColor: 'rgba(255,255,255,0.85)',
+        width: '70%',
+        height: '70%',
+        justifyContent: 'center',
+        alignItems: 'center',
+        overflow: 'hidden',
+    },
+    illustrationImage: {
+        width: '85%',
+        height: '85%',
     },
     textContainer: {
         marginTop: 40,

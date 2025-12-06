@@ -1,12 +1,18 @@
 import React from 'react';
-import { View, StyleSheet, Text } from 'react-native';
+import { View, StyleSheet, Text, Image } from 'react-native';
 
 const Start1Screen: React.FC = () => {
     return (
         <View style={styles.container}>
             <View style={styles.illustrationWrapper}>
                 <View style={styles.illustrationCard}>
-                    <View style={styles.illustrationPlaceholder} />
+                    <View style={styles.illustrationPlaceholder}>
+                        <Image
+                            source={require('../assets/track.png')}
+                            style={styles.illustrationImage}
+                            resizeMode="contain"
+                        />
+                    </View>
                 </View>
             </View>
 
@@ -40,20 +46,19 @@ const styles = StyleSheet.create({
     illustrationCard: {
         width: '100%',
         aspectRatio: 1,
-        borderRadius: 24,
-        borderWidth: 1,
-        borderColor: '#E5E7EB',
-        backgroundColor: '#F9FAFB',
         justifyContent: 'center',
         alignItems: 'center',
     },
     illustrationPlaceholder: {
-        width: '70%',
-        height: '70%',
-        borderRadius: 16,
-        borderWidth: 2,
-        borderColor: '#CBD5E1',
-        borderStyle: 'dashed',
+        width: '100%',
+        height: '100%',
+        justifyContent: 'center',
+        alignItems: 'center',
+        overflow: 'hidden',
+    },
+    illustrationImage: {
+        width: '100%',
+        height: '100%',
     },
     textContainer: {
         marginTop: 40,

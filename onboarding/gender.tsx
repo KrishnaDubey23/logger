@@ -11,7 +11,7 @@ import Svg, { Path, Circle } from 'react-native-svg';
 
 const { width } = Dimensions.get('window');
 
-type Gender = 'male' | 'female';
+type Gender = 'male' | 'female' | 'prefer-not-to-say';
 
 type GenderSelectionScreenProps = {
     onNext: () => void;
@@ -26,7 +26,7 @@ const GenderSelectionScreen: React.FC<GenderSelectionScreenProps> = ({ onNext, o
             <SafeAreaView style={styles.container}>
                 {/* Header */}
                 <View style={styles.header}>
-                    <Pressable style={styles.backButton} onPress={() => (onBack ? onBack() : console.log('Back'))}>
+                    <Pressable style={styles.backButton} onPress={() => onBack && onBack()}>
                         <Svg width={24} height={24} viewBox="0 0 24 24" fill="none">
                             <Path d="M15 18L9 12L15 6" stroke="#0F172A" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
                         </Svg>
@@ -99,8 +99,11 @@ const GenderSelectionScreen: React.FC<GenderSelectionScreenProps> = ({ onNext, o
                 </View>
 
                 {/* Prefer not to say */}
-                <Pressable onPress={() => console.log('Prefer not to say')}>
-                    <Text style={styles.preferNotToSay}>Prefer not to say</Text>
+                <Pressable onPress={() => setSelectedGender('prefer-not-to-say')}>
+                    <Text style={[
+                        styles.preferNotToSay,
+                        selectedGender === 'prefer-not-to-say' && styles.preferNotToSaySelected
+                    ]}>Prefer not to say</Text>
                 </Pressable>
 
                 {/* Footer */}
@@ -222,6 +225,10 @@ const styles = StyleSheet.create({
         fontSize: 14,
         textDecorationLine: 'underline',
         marginTop: 32,
+    },
+    preferNotToSaySelected: {
+        color: '#0F172A',
+        fontWeight: 'bold',
     },
     footer: {
         position: 'absolute',
