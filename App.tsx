@@ -33,6 +33,11 @@ import WeightSelectionScreen from './onboarding/weight';
 import ActivitySelectionScreen from './onboarding/activity';
 import LoginScreen from './screens/login';
 import SignUpScreen from './screens/signup';
+import ForgotPasswordScreen from './screens/forgotPassword';
+import OtpVerificationScreen from './screens/otpVerification';
+import VerifyCodeScreen from './screens/verifyCode';
+import NewPasswordScreen from './screens/newPassword';
+import PasswordResetSuccessScreen from './screens/passwordResetSuccess';
 import StartCarousel from './screens/startCarousel';
 
 // RoundedView: currently behaves like a normal View (continuous corners disabled)
@@ -225,7 +230,7 @@ const EXERCISE_LIBRARY: Array<{ name: string; bodyPart: BodyPart }> = [
   { name: 'Squat Clean', bodyPart: 'Full Body' },
 ];
 
-type AppStage = 'start' | 'login' | 'signup' | 'onboarding' | 'main';
+type AppStage = 'start' | 'login' | 'signup' | 'forgot-password' | 'otp-verification' | 'verify-code' | 'new-password' | 'password-reset-success' | 'onboarding' | 'main';
 
 function App() {
   const isDarkMode = useColorScheme() === 'dark';
@@ -285,7 +290,42 @@ function App() {
       <LoginScreen
         onNavigateBack={() => setStage('start')}
         onNavigateToSignUp={() => setStage('signup')}
+        onNavigateToForgotPassword={() => setStage('forgot-password')}
         onAuthComplete={handleAuthComplete}
+      />
+    );
+  } else if (stage === 'forgot-password') {
+    content = (
+      <ForgotPasswordScreen
+        onNavigateBack={() => setStage('login')}
+        onNavigateToOtp={() => setStage('otp-verification')}
+      />
+    );
+  } else if (stage === 'otp-verification') {
+    content = (
+      <OtpVerificationScreen
+        onNavigateBack={() => setStage('forgot-password')}
+        onNavigateToVerifyCode={() => setStage('verify-code')}
+      />
+    );
+  } else if (stage === 'verify-code') {
+    content = (
+      <VerifyCodeScreen
+        onNavigateBack={() => setStage('forgot-password')}
+        onNavigateToNewPassword={() => setStage('new-password')}
+      />
+    );
+  } else if (stage === 'new-password') {
+    content = (
+      <NewPasswordScreen
+        onNavigateBack={() => setStage('forgot-password')}
+        onNavigateToSuccess={() => setStage('password-reset-success')}
+      />
+    );
+  } else if (stage === 'password-reset-success') {
+    content = (
+      <PasswordResetSuccessScreen
+        onNavigateToLogin={() => setStage('login')}
       />
     );
   } else if (stage === 'signup') {

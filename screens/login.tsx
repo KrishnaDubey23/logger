@@ -4,10 +4,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 type LoginScreenProps = {
     onNavigateBack?: () => void;
     onNavigateToSignUp?: () => void;
+    onNavigateToForgotPassword?: () => void;
     onAuthComplete?: () => void;
 };
 
-export default function LoginScreen({ onNavigateBack, onNavigateToSignUp, onAuthComplete }: LoginScreenProps) {
+export default function LoginScreen({ onNavigateBack, onNavigateToSignUp, onNavigateToForgotPassword, onAuthComplete }: LoginScreenProps) {
     return (
         <SafeAreaView style={styles.container}>
             <StatusBar barStyle="dark-content" />
@@ -41,7 +42,10 @@ export default function LoginScreen({ onNavigateBack, onNavigateToSignUp, onAuth
                 </View>
 
                 {/* Forgot Password */}
-                <TouchableOpacity style={styles.forgotPasswordContainer}>
+                <TouchableOpacity 
+                    style={styles.forgotPasswordContainer}
+                    onPress={() => onNavigateToForgotPassword && onNavigateToForgotPassword()}
+                >
                     <Text style={styles.forgotPassword}>Forgot Password?</Text>
                 </TouchableOpacity>
 
