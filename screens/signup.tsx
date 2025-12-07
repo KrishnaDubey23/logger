@@ -1,6 +1,7 @@
-import { StatusBar, StyleSheet, Text, View, TextInput, TouchableOpacity } from 'react-native';
+import { StatusBar, StyleSheet, Text, View, TextInput, TouchableOpacity, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useState } from 'react';
+import Svg, { Path, Circle, Line } from 'react-native-svg';
 
 type SignUpScreenProps = {
     onNavigateBack?: () => void;
@@ -18,9 +19,11 @@ export default function SignUpScreen({ onNavigateBack, onNavigateToLogin, onAuth
 
             <View style={styles.content}>
                 {/* Back Button */}
-                <TouchableOpacity style={styles.backButton} onPress={() => onNavigateBack && onNavigateBack()}>
-                    <Text style={styles.backButtonText}>{'<'}</Text>
-                </TouchableOpacity>
+                <Pressable style={styles.backButton} onPress={() => onNavigateBack && onNavigateBack()}>
+                    <Svg width={24} height={24} viewBox="0 0 24 24" fill="none">
+                        <Path d="M15 18L9 12L15 6" stroke="#0F172A" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+                    </Svg>
+                </Pressable>
 
                 {/* Header */}
                 <Text style={styles.title}>Create an account</Text>
@@ -43,12 +46,24 @@ export default function SignUpScreen({ onNavigateBack, onNavigateToLogin, onAuth
                         secureTextEntry={!showPassword}
                         autoCapitalize="none"
                     />
-                    <TouchableOpacity
+                    <Pressable
                         style={styles.eyeIcon}
                         onPress={() => setShowPassword(!showPassword)}
                     >
-                        <Text style={styles.eyeIconText}>{showPassword ? 'Hide' : 'Show'}</Text>
-                    </TouchableOpacity>
+                        <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
+                            {showPassword ? (
+                                <>
+                                    <Path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" stroke="#9CA3AF" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+                                    <Circle cx="12" cy="12" r="3" stroke="#9CA3AF" strokeWidth={2} />
+                                </>
+                            ) : (
+                                <>
+                                    <Path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" stroke="#9CA3AF" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+                                    <Line x1="1" y1="1" x2="23" y2="23" stroke="#9CA3AF" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+                                </>
+                            )}
+                        </Svg>
+                    </Pressable>
                 </View>
 
                 {/* Confirm Password Input */}
@@ -60,12 +75,24 @@ export default function SignUpScreen({ onNavigateBack, onNavigateToLogin, onAuth
                         secureTextEntry={!showConfirmPassword}
                         autoCapitalize="none"
                     />
-                    <TouchableOpacity
+                    <Pressable
                         style={styles.eyeIcon}
                         onPress={() => setShowConfirmPassword(!showConfirmPassword)}
                     >
-                        <Text style={styles.eyeIconText}>{showConfirmPassword ? 'Hide' : 'Show'}</Text>
-                    </TouchableOpacity>
+                        <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
+                            {showConfirmPassword ? (
+                                <>
+                                    <Path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" stroke="#9CA3AF" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+                                    <Circle cx="12" cy="12" r="3" stroke="#9CA3AF" strokeWidth={2} />
+                                </>
+                            ) : (
+                                <>
+                                    <Path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" stroke="#9CA3AF" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+                                    <Line x1="1" y1="1" x2="23" y2="23" stroke="#9CA3AF" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+                                </>
+                            )}
+                        </Svg>
+                    </Pressable>
                 </View>
 
                 {/* Sign Up Button */}
@@ -111,19 +138,15 @@ const styles = StyleSheet.create({
         paddingTop: 20,
     },
     backButton: {
-        width: 40,
-        height: 40,
-        justifyContent: 'center',
+        alignSelf: 'flex-start',
+        padding: 8,
         marginBottom: 20,
-    },
-    backButtonText: {
-        fontSize: 24,
-        color: '#000',
     },
     title: {
         fontSize: 28,
         fontWeight: 'bold',
         color: '#000',
+        textAlign: 'center',
         marginBottom: 40,
     },
     input: {
@@ -154,11 +177,7 @@ const styles = StyleSheet.create({
         color: '#000',
     },
     eyeIcon: {
-        paddingHorizontal: 16,
-    },
-    eyeIconText: {
-        fontSize: 14,
-        color: '#9CA3AF',
+        padding: 8,
     },
     signUpButton: {
         backgroundColor: '#000',

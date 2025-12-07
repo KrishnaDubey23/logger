@@ -9,70 +9,71 @@ type VerifyCodeScreenProps = {
 
 export default function VerifyCodeScreen({ onNavigateBack, onNavigateToNewPassword }: VerifyCodeScreenProps) {
     return (
-        <SafeAreaView style={styles.container}>
-            <StatusBar barStyle="dark-content" />
+        <>
+            <SafeAreaView style={styles.container}>
+                <StatusBar barStyle="dark-content" />
 
-            <View style={styles.content}>
-                {/* Back Button */}
-                <Pressable style={styles.backButton} onPress={() => onNavigateBack && onNavigateBack()}>
-                    <Svg width={24} height={24} viewBox="0 0 24 24" fill="none">
-                        <Path d="M15 18L9 12L15 6" stroke="#0F172A" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-                    </Svg>
-                </Pressable>
+                <View style={styles.content}>
+                    {/* Back Button */}
+                    <Pressable style={styles.backButton} onPress={() => onNavigateBack && onNavigateBack()}>
+                        <Svg width={24} height={24} viewBox="0 0 24 24" fill="none">
+                            <Path d="M15 18L9 12L15 6" stroke="#0F172A" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+                        </Svg>
+                    </Pressable>
 
-                {/* Title */}
-                <Text style={styles.title}>Verify Code</Text>
+                    {/* Title */}
+                    <Text style={styles.title}>Verify Code</Text>
 
-                {/* Subtitle */}
-                <Text style={styles.subtitle}>Enter the 4-digit code we emailed you</Text>
+                    {/* Subtitle */}
+                    <Text style={styles.subtitle}>Enter the 4-digit code we emailed you</Text>
 
-                {/* Code Input Fields */}
-                <View style={styles.codeContainer}>
-                    <TextInput
-                        style={styles.codeInput}
-                        maxLength={1}
-                        keyboardType="number-pad"
-                        textAlign="center"
-                    />
-                    <TextInput
-                        style={styles.codeInput}
-                        maxLength={1}
-                        keyboardType="number-pad"
-                        textAlign="center"
-                    />
-                    <TextInput
-                        style={styles.codeInput}
-                        maxLength={1}
-                        keyboardType="number-pad"
-                        textAlign="center"
-                    />
-                    <TextInput
-                        style={styles.codeInput}
-                        maxLength={1}
-                        keyboardType="number-pad"
-                        textAlign="center"
-                    />
+                    {/* Code Input Fields */}
+                    <View style={styles.codeContainer}>
+                        <TextInput
+                            style={styles.codeInput}
+                            maxLength={1}
+                            keyboardType="number-pad"
+                            textAlign="center"
+                        />
+                        <TextInput
+                            style={styles.codeInput}
+                            maxLength={1}
+                            keyboardType="number-pad"
+                            textAlign="center"
+                        />
+                        <TextInput
+                            style={styles.codeInput}
+                            maxLength={1}
+                            keyboardType="number-pad"
+                            textAlign="center"
+                        />
+                        <TextInput
+                            style={styles.codeInput}
+                            maxLength={1}
+                            keyboardType="number-pad"
+                            textAlign="center"
+                        />
+                    </View>
+
+                    {/* Resend Code */}
+                    <View style={styles.resendContainer}>
+                        <Text style={styles.resendText}>Didn't receive it? </Text>
+                        <TouchableOpacity onPress={() => onNavigateBack && onNavigateBack()}>
+                            <Text style={styles.resendLink}>Resend Code</Text>
+                        </TouchableOpacity>
+                    </View>
                 </View>
-
-                {/* Resend Code */}
-                <View style={styles.resendContainer}>
-                    <Text style={styles.resendText}>Didn't receive it? </Text>
-                    <TouchableOpacity onPress={() => onNavigateBack && onNavigateBack()}>
-                        <Text style={styles.resendLink}>Resend Code</Text>
-                    </TouchableOpacity>
-                </View>
-            </View>
-
-        </SafeAreaView>
-        {/* Verify Button - Fixed at bottom */}
-        <SafeAreaView edges={['bottom']} style={styles.buttonContainer}>
-            <TouchableOpacity 
-                style={styles.verifyButton}
-                onPress={() => onNavigateToNewPassword && onNavigateToNewPassword()}
-            >
-                <Text style={styles.verifyButtonText}>Verify</Text>
-            </TouchableOpacity>
-        </SafeAreaView>
+            </SafeAreaView>
+            {/* Verify Button - Fixed at bottom */}
+            <SafeAreaView edges={['bottom']} style={styles.buttonContainer}>
+                <TouchableOpacity 
+                    style={styles.verifyButton}
+                    onPress={() => onNavigateToNewPassword && onNavigateToNewPassword()}
+                >
+                    <Text style={styles.verifyButtonText}>Verify</Text>
+                </TouchableOpacity>
+            </SafeAreaView>
+        </>
     );
 }
 
