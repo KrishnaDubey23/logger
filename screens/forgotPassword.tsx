@@ -10,43 +10,43 @@ type ForgotPasswordScreenProps = {
 export default function ForgotPasswordScreen({ onNavigateBack, onNavigateToOtp }: ForgotPasswordScreenProps) {
     return (
         <>
-            <SafeAreaView style={styles.container}>
-                <StatusBar barStyle="dark-content" />
+        <SafeAreaView style={styles.container}>
+            <StatusBar barStyle="dark-content" />
 
-                <View style={styles.content}>
-                    {/* Back Button */}
-                    <Pressable style={styles.backButton} onPress={() => onNavigateBack && onNavigateBack()}>
-                        <Svg width={24} height={24} viewBox="0 0 24 24" fill="none">
-                            <Path d="M15 18L9 12L15 6" stroke="#0F172A" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-                        </Svg>
-                    </Pressable>
+            <View style={styles.content}>
+                {/* Back Button */}
+                <Pressable style={styles.backButton} onPress={() => onNavigateBack && onNavigateBack()}>
+                    <Svg width={24} height={24} viewBox="0 0 24 24" fill="none">
+                        <Path d="M15 18L9 12L15 6" stroke="#0F172A" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+                    </Svg>
+                </Pressable>
 
-                    {/* Header */}
-                    <Text style={styles.title}>Forgot Password</Text>
-                    <Text style={styles.subtitle}>Enter your email address and we'll send you a link to reset your password.</Text>
+                {/* Header */}
+                <Text style={styles.title}>Forgot Password</Text>
+                <Text style={styles.subtitle}>Enter your email address and we'll send you a link to reset your password.</Text>
 
-                    {/* Email Input */}
-                    <View style={styles.inputGroup}>
-                        <Text style={styles.label}>Email</Text>
-                        <TextInput
-                            style={styles.input}
-                            placeholder="Enter your email"
-                            placeholderTextColor="#9CA3AF"
-                            keyboardType="email-address"
-                            autoCapitalize="none"
-                        />
-                    </View>
+                {/* Email Input */}
+                <View style={styles.inputGroup}>
+                    <Text style={styles.label}>Email</Text>
+                    <TextInput
+                        style={styles.input}
+                        placeholder="Enter your email"
+                        placeholderTextColor="#9CA3AF"
+                        keyboardType="email-address"
+                        autoCapitalize="none"
+                    />
                 </View>
-            </SafeAreaView>
-            {/* Send OTP Button - Fixed at bottom */}
-            <SafeAreaView edges={['bottom']} style={styles.buttonContainer}>
-                <TouchableOpacity 
-                    style={styles.sendButton}
-                    onPress={() => onNavigateToOtp && onNavigateToOtp()}
-                >
-                    <Text style={styles.sendButtonText}>Send OTP</Text>
-                </TouchableOpacity>
-            </SafeAreaView>
+            </View>
+        </SafeAreaView>
+        {/* Send OTP Button - Fixed at bottom */}
+        <SafeAreaView edges={['bottom']} style={styles.buttonContainer}>
+            <TouchableOpacity 
+                style={styles.sendButton}
+                onPress={() => onNavigateToOtp && onNavigateToOtp()}
+            >
+                <Text style={styles.sendButtonText}>Send OTP</Text>
+            </TouchableOpacity>
+        </SafeAreaView>
         </>
     );
 }

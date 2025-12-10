@@ -26,6 +26,7 @@ import {
 } from 'react-native';
 import Svg, { G, Polygon, Line, Circle, Text as SvgText, Path, Rect } from 'react-native-svg';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
+import SplashScreen from './screens/splash';
 import GenderSelectionScreen from './onboarding/gender';
 import AgeSelectionScreen from './onboarding/age';
 import HeightSelectionScreen from './onboarding/height';
@@ -230,12 +231,18 @@ const EXERCISE_LIBRARY: Array<{ name: string; bodyPart: BodyPart }> = [
   { name: 'Squat Clean', bodyPart: 'Full Body' },
 ];
 
-type AppStage = 'start' | 'login' | 'signup' | 'forgot-password' | 'otp-verification' | 'verify-code' | 'new-password' | 'password-reset-success' | 'onboarding' | 'main';
+type AppStage = 'splash' | 'start' | 'login' | 'signup' | 'forgot-password' | 'otp-verification' | 'verify-code' | 'new-password' | 'password-reset-success' | 'onboarding' | 'main';
 
 function App() {
   const isDarkMode = useColorScheme() === 'dark';
-  const [stage, setStage] = useState<AppStage>('start');
+  const [stage, setStage] = useState<AppStage>('splash');
   const [onboardingStep, setOnboardingStep] = useState(0);
+
+  useEffect(() => {
+    if (stage !== 'splash') return;
+    const timer = setTimeout(() => setStage('start'), 1500);
+    return () => clearTimeout(timer);
+  }, [stage]);
 
   const goNext = () => {
     setOnboardingStep((prev) => {
@@ -278,7 +285,9 @@ function App() {
   };
 
   let content: React.ReactNode;
-  if (stage === 'start') {
+  if (stage === 'splash') {
+    content = <SplashScreen onFinish={() => setStage('start')} />;
+  } else if (stage === 'start') {
     content = (
       <StartCarousel
         onSignUp={() => setStage('signup')}
